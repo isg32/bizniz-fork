@@ -180,3 +180,43 @@ def confirm_verification(token: str):
         return True, None
     except ClientResponseError as e:
         return False, str(e)
+
+# --- OAuth2 Functions ---
+
+def get_oauth2_providers():
+    """Fetches the list of available OAuth2 providers from PocketBase."""
+    if not pb: return []
+    try:
+        auth_methods = pb.collection("users").list_auth_methods()
+        return auth_methods.auth_providers
+    except Exception as e:
+        logger.error(f"Error fetching OAuth2 providers: {e}")
+        return []
+
+def auth_with_oauth2(provider: str, code: str, code_verifier: str, redirect_url: str):
+    """
+    Authenticates a user using OAuth2 authorization code.
+    Returns the auth data on success, None on failure.
+    """
+    if not pb: return None
+    try:
+        auth_data = pb.collection("users").auth_with_oauth2(
+            provider=provider,
+            code=code,
+            code_verifier=code_verifier,
+            redirect_url=redirect_url
+        )
+
+        # If this is a new user (first OAuth login), give them signup bonus
+        user_id = auth_data.record.id
+        user = get_user_by_id(user_id)
+
+        # Check if user has no coins (new user)
+        if user and (not hasattr(user, 'coins') or user.coins == 0):
+            add_coins(user_id, settings.FREE_SIGNUP_COINS, "Free signup coins via OAuth", transaction_type="bonus")
+            logger.info(f"New OAuth user {user_id} received signup bonus")
+
+        return auth_data
+    except ClientResponseError as e:
+        logger.error(f"OAuth2 authentication failed: {e}")
+        return None

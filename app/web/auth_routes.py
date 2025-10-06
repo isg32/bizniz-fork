@@ -103,6 +103,87 @@ async def logout(request: Request):
     return RedirectResponse(url="/", status_code=303)
 
 
+# --- OAuth Routes ---
+
+@router.get("/auth/oauth2/{provider}")
+async def oauth2_login(request: Request, provider: str):
+    """Initiates OAuth2 login flow by redirecting to the provider."""
+    # Get OAuth2 provider info from PocketBase
+    providers = pocketbase_service.get_oauth2_providers()
+    provider_data = next((p for p in providers if p.name == provider), None)
+
+    if not provider_data:
+        flash(request, f"OAuth provider '{provider}' is not configured.", "error")
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Store provider and code verifier in session for callback
+    request.session["oauth_provider"] = provider
+    request.session["oauth_code_verifier"] = provider_data.code_verifier
+    request.session["oauth_state"] = provider_data.state
+
+    # Build the redirect URL (where provider will send user back)
+    redirect_url = str(request.url_for("oauth2_callback", provider=provider))
+
+    # PocketBase's auth_url already contains all necessary OAuth params
+    # Just append our redirect_uri
+    import urllib.parse
+    auth_url = f"{provider_data.auth_url}{urllib.parse.quote(redirect_url, safe='')}"
+
+    return RedirectResponse(url=auth_url, status_code=303)
+
+
+@router.get("/auth/oauth2/{provider}/callback")
+async def oauth2_callback(request: Request, provider: str):
+    """Handles the OAuth2 callback after user authorizes."""
+    code = request.query_params.get("code")
+    state = request.query_params.get("state")
+
+    if not code:
+        flash(request, "OAuth authentication failed. No authorization code received.", "error")
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Retrieve stored data from session
+    code_verifier = request.session.get("oauth_code_verifier")
+    stored_provider = request.session.get("oauth_provider")
+    stored_state = request.session.get("oauth_state")
+
+    if not code_verifier or stored_provider != provider:
+        flash(request, "OAuth authentication failed. Invalid session state.", "error")
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Verify state parameter to prevent CSRF
+    if state != stored_state:
+        flash(request, "OAuth authentication failed. State mismatch.", "error")
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Build redirect URL for PocketBase
+    redirect_url = str(request.url_for("oauth2_callback", provider=provider))
+
+    # Authenticate with PocketBase
+    auth_data = pocketbase_service.auth_with_oauth2(
+        provider=provider,
+        code=code,
+        code_verifier=code_verifier,
+        redirect_url=redirect_url
+    )
+
+    # Clean up session
+    request.session.pop("oauth_code_verifier", None)
+    request.session.pop("oauth_provider", None)
+    request.session.pop("oauth_state", None)
+
+    if not auth_data:
+        flash(request, "OAuth authentication failed. Please try again.", "error")
+        return RedirectResponse(url="/login", status_code=303)
+
+    # Store auth data in session
+    request.session["user_token"] = auth_data.token
+    request.session["user_id"] = auth_data.record.id
+
+    flash(request, f"Successfully logged in with {provider.title()}!", "success")
+    return RedirectResponse(url="/dashboard", status_code=303)
+
+
 # --- Password Reset Routes ---
 
 @router.get("/forgot-password", response_class=HTMLResponse)
