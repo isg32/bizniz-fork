@@ -7,7 +7,7 @@ pocketbase
 
 # Templating Engine for Web Pages
 jinja2
-python-multipart # For handling form data in web routes
+python-multipart
 
 # Configuration Management
 pydantic-settings
@@ -18,11 +18,15 @@ stripe
 # AI Services
 google-generativeai
 elevenlabs
-# Add other SDKs like aicoustics, ocr, etc. if needed
 
 # Security and Authentication
-passlib[bcrypt] # For password hashing utilities
-python-jose[cryptography] # For JWT handling (though PocketBase handles most of this)
+passlib[bcrypt]
+python-jose[cryptography]
+itsdangerous # <-- ADD THIS LINE for secure session cookies
 
 # For making HTTP requests to external APIs
 httpx
+
+# Email Service
+resend
+pydantic[email]

@@ -1,4 +1,5 @@
 import httpx
+import json # <-- Import the json library
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -16,23 +17,34 @@ def fetch_remote_config(url: str, api_key: str) -> dict:
         response = httpx.get(url, headers=headers, timeout=5)
         response.raise_for_status()
         print("--> Remote configuration fetched successfully.")
+        # NEW: Explicitly handle JSON decoding to provide a better error message
         return response.json()
     except httpx.RequestError as e:
         raise RuntimeError(f"FATAL: Could not fetch remote configuration. Network error: {e}") from e
     except httpx.HTTPStatusError as e:
         raise RuntimeError(f"FATAL: Could not fetch remote configuration. Status code: {e.response.status_code}") from e
+    except json.JSONDecodeError: # <-- CATCH THE SPECIFIC ERROR
+        raise RuntimeError(
+            "FATAL: Remote config server responded successfully, but the response body was NOT valid JSON. "
+            "Please verify the server is returning a correctly formatted JSON object."
+        )
+
+
+# The rest of the file is unchanged.
+# --- NEW: A separate class for bootstrapping ---
+class BootstrapSettings(BaseSettings):
+    """Loads ONLY the variables needed to connect to the remote secret manager."""
+    DOTENV_SERVER_URL: str
+    DOTENV_SERVER_KEY: str
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra='ignore')
 
 
 class Settings(BaseSettings):
     """
-    Main settings class. It first loads local bootstrap vars, then fetches
-    and validates the remote configuration.
+    The main settings class that holds the complete, validated application configuration.
     """
-    # --- Step 1: Bootstrap settings loaded from the local .env file ---
     DOTENV_SERVER_URL: str
     DOTENV_SERVER_KEY: str
-
-    # --- Step 2: Settings fetched from the remote server ---
     SECRET_KEY: str = Field(..., alias='FLASK_SECRET_KEY')
     POCKETBASE_URL: str
     POCKETBASE_ADMIN_EMAIL: str
@@ -41,37 +53,28 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str
     GEMINI_API_KEY: str
     ELEVENLABS_API_KEY: str
-    RESEND_API_KEY: str # <-- THIS IS THE NEW LINE
-
-    # --- Settings with default values (can be overridden by remote config) ---
+    RESEND_API_KEY: str
     PROJECT_NAME: str = "Bizniz AI"
     API_V1_STR: str = "/api/v1"
     CREDIT_UNIT_NAME: str = "Coin"
     CREDIT_UNIT_NAME_PLURAL: str = "Coins"
     FREE_SIGNUP_COINS: int = 10
-    
-    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra='ignore')
 
 
 def get_settings() -> Settings:
     """
-    Initializes and returns the application settings.
-    This function orchestrates the bootstrap and remote fetching process.
+    Initializes and returns the application settings by combining local
+    bootstrap variables with remotely fetched secrets.
     """
-    bootstrap_settings = Settings.model_validate({})
-    
+    bootstrap_conf = BootstrapSettings()
     remote_config_data = fetch_remote_config(
-        url=bootstrap_settings.DOTENV_SERVER_URL,
-        api_key=bootstrap_settings.DOTENV_SERVER_KEY
+        url=bootstrap_conf.DOTENV_SERVER_URL,
+        api_key=bootstrap_conf.DOTENV_SERVER_KEY
     )
-    
     combined_data = {
-        **bootstrap_settings.model_dump(),
+        **bootstrap_conf.model_dump(),
         **remote_config_data
     }
-    
     return Settings.model_validate(combined_data)
 
-
-# Create the single, globally accessible instance of the settings.
 settings = get_settings()
