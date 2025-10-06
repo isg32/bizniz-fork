@@ -1,32 +1,27 @@
-
 from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+# We need to import the Tmpl dependency from the other route file
+from app.web.routes import Tmpl, flash
 from app.services import pocketbase_service
 
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(tags=["Web Auth"])
 
-def flash(request: Request, message: str, category: str = "info"):
-    """Helper function to add a flash message to the session."""
-    if "flash_messages" not in request.session:
-        request.session["flash_messages"] = []
-    request.session["flash_messages"].append((category, message))
 
 # --- Registration Routes ---
 
 @router.get("/register", response_class=HTMLResponse)
-async def get_registration_page(request: Request):
+async def get_registration_page(request: Request, context: dict = Depends(Tmpl)):
     """Serves the user registration page."""
-    return templates.TemplateResponse(
-        "auth/register.html",
-        {"request": request}
-    )
+    return templates.TemplateResponse("auth/register.html", context)
+
 
 @router.post("/register", response_class=HTMLResponse)
 async def handle_registration(
     request: Request,
+    context: dict = Depends(Tmpl), # Add context for re-rendering on error
     name: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
@@ -35,33 +30,31 @@ async def handle_registration(
     """Handles the form submission for user registration."""
     if password != password_confirm:
         flash(request, "Passwords do not match.", "error")
-        return RedirectResponse(url="/register", status_code=303)
+        # Re-render the page with the error message
+        # You need a new Tmpl call here to get fresh flash messages
+        new_context = await Tmpl(request)
+        return templates.TemplateResponse("auth/register.html", new_context)
 
     record, error = pocketbase_service.create_user(email, password, name)
 
     if error:
-        # Check for specific, common errors
         if "validation_not_unique" in str(error):
             flash(request, "This email address is already registered. Please try logging in.", "warning")
         else:
             flash(request, f"An unknown registration error occurred.", "error")
-        return RedirectResponse(url="/register", status_code=303)
+        # Re-render with the error
+        new_context = await Tmpl(request)
+        return templates.TemplateResponse("auth/register.html", new_context)
+    
+    context["title"] = "Verification Required"
+    context["message"] = "We've sent a verification link to your email. Please click it to activate your account."
+    return templates.TemplateResponse("auth/message.html", context)
 
-    # Success! Show the message page.
-    return templates.TemplateResponse(
-        "auth/message.html",
-        {
-            "request": request,
-            "title": "Verification Required",
-            "message": "We've sent a verification link to your email. Please click it to activate your account."
-        }
-    )
-
-# --- Email Verification Route ---
 
 @router.get("/verify-email/{token}", response_class=HTMLResponse)
 async def verify_email(request: Request, token: str):
     """Handles the email verification link clicked by the user."""
+    # This route doesn't render a template, it only redirects, so it doesn't need Tmpl.
     success, error = pocketbase_service.confirm_verification(token)
     
     if success:
@@ -71,13 +64,16 @@ async def verify_email(request: Request, token: str):
         flash(request, f"Email verification failed. The link may be expired or invalid.", "error")
         return RedirectResponse(url="/register", status_code=303)
 
+
+# --- Login and Logout Routes ---
+
 @router.get("/login", response_class=HTMLResponse)
-async def get_login_page(request: Request):
+async def get_login_page(request: Request, context: dict = Depends(Tmpl)):
     """Serves the user login page."""
-    # If user is already logged in, redirect them to the dashboard
     if request.session.get("user_token"):
         return RedirectResponse(url="/dashboard", status_code=303)
-    return templates.TemplateResponse("auth/login.html", {"request": request})
+    return templates.TemplateResponse("auth/login.html", context)
+
 
 @router.post("/login", response_class=HTMLResponse)
 async def handle_login(request: Request, email: str = Form(...), password: str = Form(...)):
@@ -86,18 +82,18 @@ async def handle_login(request: Request, email: str = Form(...), password: str =
 
     if not auth_data:
         flash(request, "Invalid email or password.", "error")
-        return RedirectResponse(url="/login", status_code=303)
+        return RedirectResponse(url="/login?error=invalid", status_code=303)
 
     if not auth_data.record.verified:
         flash(request, "Your account is not verified. Please check your email for the verification link.", "warning")
-        return RedirectResponse(url="/login", status_code=303)
+        return RedirectResponse(url="/login?error=unverified", status_code=303)
 
-    # Login successful, store token in session
     request.session["user_token"] = auth_data.token
     request.session["user_id"] = auth_data.record.id
     
     flash(request, "Logged in successfully!", "success")
     return RedirectResponse(url="/dashboard", status_code=303)
+
 
 @router.get("/logout")
 async def logout(request: Request):
@@ -106,35 +102,30 @@ async def logout(request: Request):
     flash(request, "You have been logged out.", "info")
     return RedirectResponse(url="/", status_code=303)
 
+
+# --- Password Reset Routes ---
+
 @router.get("/forgot-password", response_class=HTMLResponse)
-async def get_forgot_password_page(request: Request):
+async def get_forgot_password_page(request: Request, context: dict = Depends(Tmpl)):
     """Serves the forgot password page."""
-    return templates.TemplateResponse("auth/forgot_password.html", {"request": request})
+    return templates.TemplateResponse("auth/forgot_password.html", context)
 
 
 @router.post("/forgot-password", response_class=HTMLResponse)
-async def handle_forgot_password(request: Request, email: str = Form(...)):
+async def handle_forgot_password(request: Request, context: dict = Depends(Tmpl), email: str = Form(...)):
     """Handles the request to send a password reset email via PocketBase."""
     pocketbase_service.request_password_reset(email)
     
-    # IMPORTANT: Always show a generic message to prevent email enumeration attacks.
-    return templates.TemplateResponse(
-        "auth/message.html",
-        {
-            "request": request,
-            "title": "Check Your Email",
-            "message": "If an account with that email exists, we've sent a link to reset your password."
-        }
-    )
+    context["title"] = "Check Your Email"
+    context["message"] = "If an account with that email exists, we've sent a link to reset your password."
+    return templates.TemplateResponse("auth/message.html", context)
 
 
 @router.get("/reset-password/{token}", response_class=HTMLResponse)
-async def get_reset_password_page(request: Request, token: str):
+async def get_reset_password_page(request: Request, token: str, context: dict = Depends(Tmpl)):
     """Serves the page where the user can enter their new password."""
-    return templates.TemplateResponse(
-        "auth/reset_password_form.html",
-        {"request": request, "token": token}
-    )
+    context["token"] = token
+    return templates.TemplateResponse("auth/reset_password_form.html", context)
 
 
 @router.post("/reset-password/{token}", response_class=HTMLResponse)

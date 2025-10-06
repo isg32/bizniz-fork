@@ -8,18 +8,25 @@ stripe.api_key = settings.STRIPE_API_KEY
 
 def get_all_active_products_and_prices():
     """
-    Fetches all active products from Stripe and separates them into
-    one-time packs and recurring subscription plans.
+    Fetches all active products from Stripe that are scoped to this specific application
+    and separates them into one-time packs and recurring subscription plans.
     """
+    # THIS IS THE UNIQUE IDENTIFIER FOR OUR APPLICATION
+    APP_ID = "bizniz_ai_v1"
+
     try:
-        prices = stripe.Price.list(active=True, expand=['data.product']).data
-        
+        # We now search for products with the correct app_id metadata
+        products = stripe.Product.search(
+            query=f"active:'true' AND metadata['app_id']:'{APP_ID}'",
+            expand=['data.default_price']
+        ).data
+
         one_time_packs = []
         subscription_plans = []
 
-        for price in prices:
-            product = price.product
-            if not (product and product.active):
+        for product in products:
+            price = product.default_price
+            if not price:
                 continue
 
             item = {
@@ -35,7 +42,6 @@ def get_all_active_products_and_prices():
             else:
                 one_time_packs.append(item)
         
-        # Sort both lists by price
         one_time_packs.sort(key=lambda x: x['price'])
         subscription_plans.sort(key=lambda x: x['price'])
         
@@ -46,10 +52,12 @@ def get_all_active_products_and_prices():
         return [], []
 
 
+# The rest of the file (create_checkout_session, create_customer_portal_session)
+# does not need to be changed.
+
 def create_checkout_session(price_id: str, user_id: str, request: object, mode: str):
     """
     Creates a Stripe Checkout session for a given price ID, user, and mode.
-    Handles associating the checkout with an existing Stripe customer if one exists.
     """
     try:
         base_url = str(request.base_url)
@@ -64,11 +72,9 @@ def create_checkout_session(price_id: str, user_id: str, request: object, mode: 
             'client_reference_id': user_id,
         }
         
-        # Best Practice: If user is already a customer, use their existing customer ID.
         if user and user.stripe_customer_id:
             session_params['customer'] = user.stripe_customer_id
         else:
-            # If it's a new customer, pre-fill their email address
             session_params['customer_email'] = user.email
 
         checkout_session = stripe.checkout.Session.create(**session_params)
