@@ -33,9 +33,7 @@ class Settings(BaseSettings):
     DOTENV_SERVER_KEY: str
 
     # --- Step 2: Settings fetched from the remote server ---
-    # We use 'Field(alias=...)' to map the JSON key from your server
-    # to the variable name we use in our app.
-    SECRET_KEY: str = Field(..., alias='FLASK_SECRET_KEY') # Assuming remote key is FLASK_SECRET_KEY
+    SECRET_KEY: str = Field(..., alias='FLASK_SECRET_KEY')
     POCKETBASE_URL: str
     POCKETBASE_ADMIN_EMAIL: str
     POCKETBASE_ADMIN_PASSWORD: str
@@ -43,7 +41,8 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str
     GEMINI_API_KEY: str
     ELEVENLABS_API_KEY: str
-    
+    RESEND_API_KEY: str # <-- THIS IS THE NEW LINE
+
     # --- Settings with default values (can be overridden by remote config) ---
     PROJECT_NAME: str = "Bizniz AI"
     API_V1_STR: str = "/api/v1"
@@ -51,7 +50,6 @@ class Settings(BaseSettings):
     CREDIT_UNIT_NAME_PLURAL: str = "Coins"
     FREE_SIGNUP_COINS: int = 10
     
-    # This tells Pydantic to read from a .env file to start the process
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra='ignore')
 
 
@@ -60,25 +58,20 @@ def get_settings() -> Settings:
     Initializes and returns the application settings.
     This function orchestrates the bootstrap and remote fetching process.
     """
-    # Load the local-only variables first
     bootstrap_settings = Settings.model_validate({})
     
-    # Fetch the remote configuration
     remote_config_data = fetch_remote_config(
         url=bootstrap_settings.DOTENV_SERVER_URL,
         api_key=bootstrap_settings.DOTENV_SERVER_KEY
     )
     
-    # Combine the fetched remote data with the local data
     combined_data = {
         **bootstrap_settings.model_dump(),
         **remote_config_data
     }
     
-    # Create the final, validated settings object
     return Settings.model_validate(combined_data)
 
 
 # Create the single, globally accessible instance of the settings.
-# This code runs only once when the application starts.
 settings = get_settings()

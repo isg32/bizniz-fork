@@ -12,25 +12,75 @@
             <p class="text-lg text-base-content/70 mt-1">Welcome back, {{ current_user.name }}!</p>
         </div>
 
-        <div class="card bg-base-100 shadow-xl">
-            <div class="card-body">
-                <h2 class="card-title">Account Overview</h2>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    <div class="stat">
-                        <div class="stat-title">{{ settings.CREDIT_UNIT_NAME_PLURAL }}</div>
-                        <div class="stat-value text-primary">{{ "%.0f"|format(current_user.coins|float) }}</div>
-                        <div class="stat-desc">Your current balance</div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Left Column -->
+            <div class="lg:col-span-2 space-y-8">
+                <div class="card bg-base-100 shadow-xl">
+                    <div class="card-body">
+                        <h2 class="card-title">Account Overview</h2>
+                        <div class="stats stats-vertical md:stats-horizontal shadow w-full mt-4">
+                            <div class="stat">
+                                <div class="stat-figure text-primary"><i class="fa-solid fa-coins fa-2x"></i></div>
+                                <div class="stat-title">{{ settings.CREDIT_UNIT_NAME_PLURAL }} Balance</div>
+                                <div class="stat-value text-primary">{{ "%.0f"|format(current_user.coins|float) }}</div>
+                                <div class="stat-actions">
+                                    <a href="/pricing" class="btn btn-sm btn-primary">Get More</a>
+                                </div>
+                            </div>
+                            <div class="stat">
+                                <div class="stat-figure text-secondary"><i class="fa-solid fa-credit-card fa-2x"></i></div>
+                                <div class="stat-title">Subscription Plan</div>
+                                <div class="stat-value text-secondary">{{ current_user.active_plan_name or 'None' }}</div>
+                                <div class="stat-desc">Status: <span class="font-semibold">{{ current_user.subscription_status|capitalize }}</span></div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="stat">
-                        <div class="stat-title">Subscription</div>
-                        <div class="stat-value text-secondary">{{ current_user.subscription_status|capitalize }}</div>
-                        <div class="stat-desc">
-                            {% if current_user.subscription_status == 'active' %}
-                                <span class="badge badge-success">Active</span>
+                </div>
+
+                <div class="card bg-base-100 shadow-xl">
+                    <div class="card-body">
+                        <h2 class="card-title">Transaction History</h2>
+                        <div class="overflow-x-auto mt-4">
+                            {% if transactions %}
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th class="text-right">Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for tx in transactions %}
+                                    <tr>
+                                        <td>{{ tx.created.strftime('%Y-%m-%d %H:%M') }}</td>
+                                        <td>{{ tx.description }}</td>
+                                        <td class="text-right font-mono {% if tx.amount > 0 %}text-success{% else %}text-error{% endif %}">
+                                            {{ "{:+.0f}".format(tx.amount) }}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                             {% else %}
-                                <span class="badge badge-ghost">Inactive</span>
+                            <p class="text-base-content/70">You have no transactions yet.</p>
                             {% endif %}
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="lg:col-span-1 space-y-8">
+                <div class="card bg-base-100 shadow-xl">
+                    <div class="card-body">
+                        <h2 class="card-title">Manage Billing</h2>
+                        <p class="text-base-content/70 text-sm mt-2">Manage your subscription, view invoices, and update your payment method via our secure portal.</p>
+                        {% if current_user.stripe_customer_id %}
+                            <a href="/customer-portal" class="btn btn-secondary mt-4">Open Customer Portal</a>
+                        {% else %}
+                            <p class="text-sm mt-4 p-2 bg-base-200 rounded-md">You do not have any active subscriptions to manage.</p>
+                        {% endif %}
                     </div>
                 </div>
             </div>

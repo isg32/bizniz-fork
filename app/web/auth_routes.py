@@ -105,3 +105,55 @@ async def logout(request: Request):
     request.session.clear()
     flash(request, "You have been logged out.", "info")
     return RedirectResponse(url="/", status_code=303)
+
+@router.get("/forgot-password", response_class=HTMLResponse)
+async def get_forgot_password_page(request: Request):
+    """Serves the forgot password page."""
+    return templates.TemplateResponse("auth/forgot_password.html", {"request": request})
+
+
+@router.post("/forgot-password", response_class=HTMLResponse)
+async def handle_forgot_password(request: Request, email: str = Form(...)):
+    """Handles the request to send a password reset email via PocketBase."""
+    pocketbase_service.request_password_reset(email)
+    
+    # IMPORTANT: Always show a generic message to prevent email enumeration attacks.
+    return templates.TemplateResponse(
+        "auth/message.html",
+        {
+            "request": request,
+            "title": "Check Your Email",
+            "message": "If an account with that email exists, we've sent a link to reset your password."
+        }
+    )
+
+
+@router.get("/reset-password/{token}", response_class=HTMLResponse)
+async def get_reset_password_page(request: Request, token: str):
+    """Serves the page where the user can enter their new password."""
+    return templates.TemplateResponse(
+        "auth/reset_password_form.html",
+        {"request": request, "token": token}
+    )
+
+
+@router.post("/reset-password/{token}", response_class=HTMLResponse)
+async def handle_reset_password(
+    request: Request,
+    token: str,
+    password: str = Form(...),
+    password_confirm: str = Form(...)
+):
+    """Handles the form submission for resetting the password."""
+    if password != password_confirm:
+        flash(request, "Passwords do not match.", "error")
+        return RedirectResponse(url=f"/reset-password/{token}", status_code=303)
+
+    success, error = pocketbase_service.confirm_password_reset(token, password, password_confirm)
+    
+    if success:
+        flash(request, "Your password has been reset successfully. Please log in.", "success")
+        return RedirectResponse(url="/login", status_code=303)
+    else:
+        flash(request, "Failed to reset password. The link may be invalid or expired.", "error")
+        return RedirectResponse(url=f"/reset-password/{token}", status_code=303)
