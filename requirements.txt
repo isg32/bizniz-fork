@@ -1,0 +1,28 @@
+# FastAPI and Server
+fastapi
+uvicorn[standard]
+
+# PocketBase SDK
+pocketbase
+
+# Templating Engine for Web Pages
+jinja2
+python-multipart # For handling form data in web routes
+
+# Configuration Management
+pydantic-settings
+
+# Stripe API for Payments
+stripe
+
+# AI Services
+google-generativeai
+elevenlabs
+# Add other SDKs like aicoustics, ocr, etc. if needed
+
+# Security and Authentication
+passlib[bcrypt] # For password hashing utilities
+python-jose[cryptography] # For JWT handling (though PocketBase handles most of this)
+
+# For making HTTP requests to external APIs
+httpx

@@ -1,0 +1,49 @@
+<header class="bg-base-100/80 backdrop-blur-lg sticky top-0 z-50 shadow-sm">
+    <div class="navbar max-w-7xl mx-auto px-4">
+        <div class="navbar-start">
+            <div class="dropdown">
+                <div tabindex="0" role="button" class="btn btn-ghost lg:hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h8m-8 6h16" /></svg>
+                </div>
+                <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                    <li><a href="/pricing">Pricing</a></li>
+                    <li><a href="https://github.com/bugswriter" target="_blank">Contact</a></li>
+                </ul>
+            </div>
+            <a href="/" class="btn btn-ghost text-xl font-bold text-primary">
+                <i class="fa-solid fa-brain"></i> {{ settings.PROJECT_NAME }}
+            </a>
+        </div>
+        <div class="navbar-center hidden lg:flex">
+            <ul class="menu menu-horizontal px-1 font-medium">
+                <li><a href="/pricing">Pricing</a></li>
+                <li><a href="https://github.com/bugswriter" target="_blank">Contact</a></li>
+            </ul>
+        </div>
+        <div class="navbar-end gap-2">
+            {% if current_user %}
+                <div class="hidden sm:flex items-center gap-2">
+                    <div class="badge badge-primary badge-outline font-semibold">
+                         <i class="fa-solid fa-coins mr-2"></i> {{ "%.0f"|format(current_user.coins|float) }}
+                    </div>
+                </div>
+                <div class="dropdown dropdown-end">
+                    <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar">
+                        <div class="w-10 rounded-full bg-primary text-primary-content flex items-center justify-center">
+                            <span class="text-xl font-bold">{{ current_user.name[0]|upper if current_user.name else 'U' }}</span>
+                        </div>
+                    </div>
+                    <ul tabindex="0" class="menu menu-sm dropdown-content mt-3 z-[1] p-2 shadow bg-base-100 rounded-box w-52">
+                        <li><a href="/dashboard" class="font-semibold">Dashboard</a></li>
+                        <li class="sm:hidden"><a href="/pricing">Buy Coins</a></li>
+                        <div class="divider my-1"></div>
+                        <li><a href="/logout">Logout</a></li>
+                    </ul>
+                </div>
+            {% else %}
+                <a href="/login" class="btn btn-ghost">Login</a>
+                <a href="/register" class="btn btn-primary">Get Started</a>
+            {% endif %}
+        </div>
+    </div>
+</header>

@@ -1,0 +1,30 @@
+
+{% extends "layouts/base.html" %}
+
+{% block title %}
+{{ settings.PROJECT_NAME }} - Studio-Quality Audio, One Click Away.
+{% endblock %}
+
+{% block content %}
+<div class="hero min-h-screen bg-base-200" style="background-image: radial-gradient(circle at top, oklch(var(--p)/.1), transparent 40%);">
+  <div class="hero-content text-center">
+    <div class="max-w-2xl">
+      <h1 class="text-5xl md:text-6xl font-extrabold tracking-tight fade-in-up">
+        Studio-Quality Audio, One Click Away.
+      </h1>
+      <p class="py-6 text-lg text-base-content/80 fade-in-up delay-100">
+        {{ settings.PROJECT_NAME }} uses advanced AI to remove background noise, balance voice levels, and eliminate harsh sounds. Get pristine audio for your podcasts, videos, and streams instantly.
+      </p>
+      <div class="fade-in-up delay-200">
+        <a href="/register" class="btn btn-primary btn-lg shadow-lg">
+            Get Started for Free
+            <i class="fa-solid fa-arrow-right"></i>
+        </a>
+        <p class="text-sm mt-3 text-base-content/60">
+            Sign up and get {{ settings.FREE_SIGNUP_COINS }} free {{ settings.CREDIT_UNIT_NAME_PLURAL }}. No credit card required.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

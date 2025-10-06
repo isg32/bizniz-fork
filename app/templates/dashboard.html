@@ -1,0 +1,40 @@
+{% extends "layouts/base.html" %}
+{% block title %}Your Dashboard{% endblock %}
+
+{% block content %}
+<div class="p-4 sm:p-6 lg:p-8">
+    <div class="max-w-7xl mx-auto">
+        
+        {% include 'partials/flash.html' %}
+        
+        <div class="pb-8 border-b border-base-300/50 mb-8">
+            <h1 class="text-3xl font-bold">Dashboard</h1>
+            <p class="text-lg text-base-content/70 mt-1">Welcome back, {{ current_user.name }}!</p>
+        </div>
+
+        <div class="card bg-base-100 shadow-xl">
+            <div class="card-body">
+                <h2 class="card-title">Account Overview</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div class="stat">
+                        <div class="stat-title">{{ settings.CREDIT_UNIT_NAME_PLURAL }}</div>
+                        <div class="stat-value text-primary">{{ "%.0f"|format(current_user.coins|float) }}</div>
+                        <div class="stat-desc">Your current balance</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-title">Subscription</div>
+                        <div class="stat-value text-secondary">{{ current_user.subscription_status|capitalize }}</div>
+                        <div class="stat-desc">
+                            {% if current_user.subscription_status == 'active' %}
+                                <span class="badge badge-success">Active</span>
+                            {% else %}
+                                <span class="badge badge-ghost">Inactive</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

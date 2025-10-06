@@ -1,0 +1,53 @@
+
+{% extends "layouts/base.html" %}
+{% block title %}Policies - {{ settings.PROJECT_NAME }}{% endblock %}
+
+{% block content %}
+<div class="p-4 sm:p-6 lg:p-8 py-20 bg-base-200">
+    <div class="max-w-4xl mx-auto bg-base-100 p-8 rounded-lg shadow-lg">
+        <h1 class="text-4xl font-extrabold text-primary mb-8">Policies</h1>
+
+        <!-- The `prose` class from DaisyUI/Tailwind adds beautiful typography defaults. -->
+        <div class="space-y-8 prose max-w-none">
+
+            <section>
+                <h2>1. Terms and Conditions</h2>
+                <p>
+                    By using {{ settings.PROJECT_NAME }}, you agree to use the service for lawful purposes only and in accordance with our usage policies.
+                    Any misuse, automation abuse, or attempt to reverse-engineer the service may lead to account suspension or termination.
+                    We reserve the right to modify these terms at any time without prior notice.
+                </p>
+            </section>
+
+            <section>
+                <h2>2. Cancellation & Refund Policy</h2>
+                <p>
+                    Since our service is based on a digital coin system, all purchases of {{ settings.CREDIT_UNIT_NAME_PLURAL }} are final and non-refundable.
+                    If you experience a technical failure preventing you from using the service or an accidental duplicate payment, please contact us within 7 days of purchase.
+                    Refunds are reviewed on a case-by-case basis.
+                </p>
+            </section>
+            
+            <section>
+                <h2>3. Privacy & Data Handling</h2>
+                <p>
+                    We collect minimal user information required for account creation and payment processing. We do not store your credit card information; all transactions are processed securely via Stripe. 
+                    <strong>Any content (text, audio, images) you submit to our AI services is processed on secure third-party servers (e.g., Google) and is not stored by us long-term.</strong> We respect your content's privacy.
+                </p>
+            </section>
+
+            <section>
+                <h2>4. Contact & Complaints</h2>
+                <p>
+                    For questions, feedback, or complaints related to privacy, billing, or service, please reach out to our support team.
+                </p>
+            </section>
+
+            <section class="text-sm text-base-content/70 pt-4 border-t border-base-300 mt-8">
+                <p>By using {{ settings.PROJECT_NAME }}, you agree to all the above policies and terms.</p>
+            </section>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
