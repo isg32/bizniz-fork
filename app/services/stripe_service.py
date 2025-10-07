@@ -72,9 +72,9 @@ def create_checkout_session(price_id: str, user_id: str, request: object, mode: 
             'client_reference_id': user_id,
         }
         
-        if user and user.stripe_customer_id:
+        if user and hasattr(user, 'stripe_customer_id') and user.stripe_customer_id:
             session_params['customer'] = user.stripe_customer_id
-        else:
+        elif user:
             session_params['customer_email'] = user.email
 
         checkout_session = stripe.checkout.Session.create(**session_params)
