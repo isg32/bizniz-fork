@@ -98,3 +98,21 @@ def create_customer_portal_session(stripe_customer_id: str, request: object):
     except Exception as e:
         print(f"Stripe error creating customer portal for {stripe_customer_id}: {e}")
         return None
+
+
+def cancel_subscription(stripe_subscription_id: str) -> bool:
+    """
+    Cancels a Stripe subscription at the end of the billing period.
+    Returns True if successful, False otherwise.
+    """
+    try:
+        # Cancel at period end so user keeps access until billing period ends
+        stripe.Subscription.modify(
+            stripe_subscription_id,
+            cancel_at_period_end=True
+        )
+        print(f"Successfully cancelled subscription {stripe_subscription_id} at period end.")
+        return True
+    except Exception as e:
+        print(f"Stripe error cancelling subscription {stripe_subscription_id}: {e}")
+        return False

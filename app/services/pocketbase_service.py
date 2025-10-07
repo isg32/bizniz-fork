@@ -101,8 +101,11 @@ def get_user_by_stripe_customer_id(customer_id: str):
     """Fetches a user record by their Stripe Customer ID."""
     if not admin_pb: return None
     try:
-        records = admin_pb.collection("users").get_list(1, 1, {"filter": f'stripe_customer_id="{customer_id}"'})
-        return records.items[0] if records.items else None
+        # Use get_full_list with filter instead of get_list
+        records = admin_pb.collection("users").get_full_list(
+            query_params={"filter": f'stripe_customer_id = "{customer_id}"'}
+        )
+        return records[0] if records else None
     except ClientResponseError as e:
         logger.error(f"Error fetching user by stripe_customer_id={customer_id}: {e}")
         return None

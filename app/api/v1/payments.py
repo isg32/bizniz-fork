@@ -25,17 +25,38 @@ def handle_checkout_completed(session: dict):
     """
     user_id = session.get('client_reference_id')
     stripe_customer_id = session.get('customer')
-    if not all([user_id, stripe_customer_id]):
-        print(f"WEBHOOK-ERROR: Missing user_id or customer_id in session {session.get('id')}.")
+
+    print(f"WEBHOOK-DEBUG: Session ID: {session.get('id')}")
+    print(f"WEBHOOK-DEBUG: client_reference_id: {user_id}")
+    print(f"WEBHOOK-DEBUG: customer: {stripe_customer_id}")
+    print(f"WEBHOOK-DEBUG: mode: {session.get('mode')}")
+
+    if not user_id:
+        print(f"WEBHOOK-ERROR: Missing client_reference_id in session {session.get('id')}.")
         return
 
-    # --- Link User to Stripe Customer ID ---
+    # --- Get User ---
     user = pocketbase_service.get_user_by_id(user_id)
     if not user:
         print(f"WEBHOOK-ERROR: User with ID {user_id} not found.")
         return
-        
-    update_data = {"stripe_customer_id": stripe_customer_id}
+
+    # --- Handle Customer ID ---
+    # For new users, customer might be None initially, so we retrieve it from Stripe
+    if not stripe_customer_id:
+        # Try to get customer from customer_details or wait for customer.created event
+        customer_email = session.get('customer_details', {}).get('email') or session.get('customer_email')
+        print(f"WEBHOOK-INFO: No customer ID in session, but found email: {customer_email}")
+
+        # We can still fulfill the order without immediately linking the customer
+        # The customer.created webhook will handle the linking
+        stripe_customer_id = None
+
+    # Update user with stripe_customer_id if we have it
+    update_data = {}
+    if stripe_customer_id:
+        update_data["stripe_customer_id"] = stripe_customer_id
+        print(f"WEBHOOK-INFO: Linking user {user_id} with Stripe customer {stripe_customer_id}.")
 
     # If it's a new subscription, store the subscription details
     if session.get('mode') == 'subscription':
@@ -44,28 +65,38 @@ def handle_checkout_completed(session: dict):
         update_data['subscription_status'] = 'active'
         # We need to fetch the plan name for the user's dashboard
         try:
-            sub_items = stripe.Subscription.retrieve(stripe_subscription_id, expand=['items.data.price.product']).items.data
-            if sub_items:
-                update_data['active_plan_name'] = sub_items[0].price.product.name
+            subscription = stripe.Subscription.retrieve(stripe_subscription_id, expand=['items.data.price.product'])
+            # Access items - it could be a list or have a 'data' attribute
+            items = subscription.get('items')
+            if items:
+                sub_items = items.get('data', []) if isinstance(items, dict) else items
+                if sub_items and len(sub_items) > 0:
+                    product = sub_items[0].get('price', {}).get('product', {})
+                    if isinstance(product, dict):
+                        update_data['active_plan_name'] = product.get('name')
+                    else:
+                        # If product is expanded, it should have a name attribute
+                        update_data['active_plan_name'] = getattr(product, 'name', None)
         except Exception as e:
             print(f"WEBHOOK-API-ERROR: Could not retrieve subscription details for {stripe_subscription_id}. Error: {e}")
 
-    pocketbase_service.update_user(user_id, update_data)
-    print(f"WEBHOOK-INFO: Linked user {user_id} with Stripe customer {stripe_customer_id}.")
+    if update_data:
+        pocketbase_service.update_user(user_id, update_data)
 
     # --- Fulfill the Purchase ---
     try:
-        line_items = stripe.checkout.Session.list_line_items(session.id, limit=1, expand=['data.price.product'])
+        line_items = stripe.checkout.Session.list_line_items(session.get('id'), limit=1, expand=['data.price.product'])
         if not line_items.data: return
 
         product_name, coins_to_add = _get_product_details_from_line_item(line_items.data[0])
         description = f"Purchase of {product_name}"
-        transaction_type = "purchase" if session.get('mode') == 'payment' else "renewal"
+        transaction_type = "purchase" if session.get('mode') == 'payment' else "subscription"
 
         if coins_to_add > 0:
             pocketbase_service.add_coins(user_id, coins_to_add, description, session.get('payment_intent'), transaction_type)
+            print(f"WEBHOOK-SUCCESS: Added {coins_to_add} coins to user {user_id} for {product_name}")
         else:
-            print(f"WEBHOOK-WARN: Product in session {session.id} has no 'coins' metadata.")
+            print(f"WEBHOOK-WARN: Product in session {session.get('id')} has no 'coins' metadata.")
     except Exception as e:
         print(f"WEBHOOK-API-ERROR: Failed to fulfill purchase for session {session.get('id')}: {e}")
 
@@ -115,12 +146,90 @@ def handle_subscription_deleted(subscription: dict):
         pocketbase_service.update_user(user.id, update_data)
         print(f"WEBHOOK-SUCCESS: Marked subscription as 'cancelled' for user {user.id}.")
 
+
+def handle_subscription_updated(subscription: dict):
+    """
+    Handles 'customer.subscription.updated' when a subscription is modified.
+    This includes when cancel_at_period_end is set to True.
+    """
+    stripe_subscription_id = subscription.get('id')
+    stripe_customer_id = subscription.get('customer')
+
+    print(f"WEBHOOK-DEBUG: Processing subscription update for sub {stripe_subscription_id}, customer {stripe_customer_id}")
+    print(f"WEBHOOK-DEBUG: cancel_at_period_end = {subscription.get('cancel_at_period_end')}")
+    print(f"WEBHOOK-DEBUG: status = {subscription.get('status')}")
+
+    user = pocketbase_service.get_user_by_stripe_customer_id(stripe_customer_id)
+
+    if not user:
+        print(f"WEBHOOK-WARN: No user found for Stripe customer {stripe_customer_id}")
+        return
+
+    print(f"WEBHOOK-DEBUG: Found user {user.id} with subscription_id {getattr(user, 'stripe_subscription_id', 'None')}")
+
+    if user.stripe_subscription_id != stripe_subscription_id:
+        print(f"WEBHOOK-WARN: User {user.id} subscription ID mismatch. Expected {stripe_subscription_id}, got {user.stripe_subscription_id}")
+        return
+
+    update_data = {}
+
+    # Check if subscription is set to cancel at period end
+    if subscription.get('cancel_at_period_end'):
+        update_data['subscription_status'] = 'canceling'
+        print(f"WEBHOOK-SUCCESS: Subscription {stripe_subscription_id} for user {user.id} is set to cancel at period end.")
+    # Check if subscription was reactivated
+    elif subscription.get('status') == 'active' and not subscription.get('cancel_at_period_end'):
+        update_data['subscription_status'] = 'active'
+        print(f"WEBHOOK-SUCCESS: Subscription {stripe_subscription_id} for user {user.id} was reactivated.")
+
+    if update_data:
+        success, message = pocketbase_service.update_user(user.id, update_data)
+        if success:
+            print(f"WEBHOOK-INFO: User {user.id} updated successfully with status: {update_data.get('subscription_status')}")
+        else:
+            print(f"WEBHOOK-ERROR: Failed to update user {user.id}: {message}")
+
+def handle_customer_created(customer: dict):
+    """
+    Handles 'customer.created' event to link Stripe customer to user.
+    This is useful when checkout.session.completed doesn't have the customer ID yet.
+    """
+    stripe_customer_id = customer.get('id')
+    customer_email = customer.get('email')
+
+    print(f"WEBHOOK-DEBUG: Customer created - ID: {stripe_customer_id}, Email: {customer_email}")
+
+    if not customer_email:
+        print(f"WEBHOOK-WARN: Customer {stripe_customer_id} has no email, cannot link to user")
+        return
+
+    # Find user by email
+    try:
+        users = pocketbase_service.admin_pb.collection("users").get_full_list(
+            query_params={"filter": f'email="{customer_email}"'}
+        )
+        if users:
+            user = users[0]
+            # Only update if user doesn't already have a stripe_customer_id
+            if not hasattr(user, 'stripe_customer_id') or not user.stripe_customer_id:
+                pocketbase_service.update_user(user.id, {"stripe_customer_id": stripe_customer_id})
+                print(f"WEBHOOK-SUCCESS: Linked Stripe customer {stripe_customer_id} to user {user.id}")
+            else:
+                print(f"WEBHOOK-INFO: User {user.id} already has stripe_customer_id: {user.stripe_customer_id}")
+        else:
+            print(f"WEBHOOK-WARN: No user found with email {customer_email}")
+    except Exception as e:
+        print(f"WEBHOOK-ERROR: Failed to link customer {stripe_customer_id}: {e}")
+
+
 # --- Main Webhook Route ---
 
 EVENT_HANDLERS = {
     'checkout.session.completed': handle_checkout_completed,
     'invoice.payment_succeeded': handle_invoice_succeeded,
     'customer.subscription.deleted': handle_subscription_deleted,
+    'customer.subscription.updated': handle_subscription_updated,
+    'customer.created': handle_customer_created,
 }
 
 @router.post("/stripe-webhook", include_in_schema=False)

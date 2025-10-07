@@ -136,6 +136,13 @@ async def create_checkout_session(
         flash(request, "You must be logged in to make a purchase.", "error")
         return RedirectResponse(url="/login", status_code=303)
 
+    # Check if user already has an active subscription when trying to subscribe
+    if mode == "subscription":
+        user = pocketbase_service.get_user_by_id(user_id)
+        if user and hasattr(user, 'subscription_status') and user.subscription_status == 'active':
+            flash(request, "You already have an active subscription. Please manage it from your dashboard.", "warning")
+            return RedirectResponse(url="/dashboard", status_code=303)
+
     session = stripe_service.create_checkout_session(price_id, user_id, request, mode)
     
     if session and session.url:
@@ -143,3 +150,32 @@ async def create_checkout_session(
     else:
         flash(request, "Could not create a payment session. Please try again.", "error")
         return RedirectResponse(url="/pricing", status_code=303)
+
+
+@router.post("/cancel-subscription", tags=["Web Frontend"])
+async def cancel_subscription(
+    request: Request,
+    user_token: str = Depends(get_current_user_from_session)
+):
+    """Cancels the user's active subscription."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        flash(request, "You must be logged in to cancel a subscription.", "error")
+        return RedirectResponse(url="/login", status_code=303)
+
+    user = pocketbase_service.get_user_by_id(user_id)
+
+    # Check if user has an active subscription
+    if not user or user.subscription_status != 'active' or not user.stripe_subscription_id:
+        flash(request, "You don't have an active subscription to cancel.", "error")
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    # Cancel the subscription via Stripe
+    success = stripe_service.cancel_subscription(user.stripe_subscription_id)
+
+    if success:
+        flash(request, "Your subscription has been cancelled. You'll continue to have access until the end of your billing period.", "success")
+    else:
+        flash(request, "Failed to cancel subscription. Please try again or contact support.", "error")
+
+    return RedirectResponse(url="/dashboard", status_code=303)

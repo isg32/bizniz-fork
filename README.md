@@ -1,4 +1,3 @@
-
 # Bizniz AI - FastAPI Business Platform
 
 Welcome to Bizniz AI, a robust SaaS boilerplate built with a modern Python stack. This project provides a complete foundation for building a business around a coin-based API, including a professional website, user authentication, a payment system, and a secure API for external applications.
@@ -66,6 +65,9 @@ Follow these steps to set up and run the project locally.
         *   `name` (Type: `text`, default: empty)
         *   `coins` (Type: `number`, default: `10`)
         *   `subscription_status` (Type: `text`, default: `inactive`)
+        *   `stripe_customer_id` (Type: `text`, optional - leave "Required" unchecked)
+        *   `stripe_subscription_id` (Type: `text`, optional - leave "Required" unchecked)
+        *   `active_plan_name` (Type: `text`, optional - leave "Required" unchecked)
 
 #### 4. Stripe Configuration
 
