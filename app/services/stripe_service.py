@@ -116,3 +116,21 @@ def cancel_subscription(stripe_subscription_id: str) -> bool:
     except Exception as e:
         print(f"Stripe error cancelling subscription {stripe_subscription_id}: {e}")
         return False
+
+
+def reactivate_subscription(stripe_subscription_id: str) -> bool:
+    """
+    Reactivates a Stripe subscription that was set to cancel at period end.
+    Returns True if successful, False otherwise.
+    """
+    try:
+        # Remove the cancel_at_period_end flag to reactivate
+        stripe.Subscription.modify(
+            stripe_subscription_id,
+            cancel_at_period_end=False
+        )
+        print(f"Successfully reactivated subscription {stripe_subscription_id}.")
+        return True
+    except Exception as e:
+        print(f"Stripe error reactivating subscription {stripe_subscription_id}: {e}")
+        return False

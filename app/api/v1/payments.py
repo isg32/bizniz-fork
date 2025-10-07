@@ -134,18 +134,25 @@ def handle_invoice_succeeded(invoice: dict):
 def handle_subscription_deleted(subscription: dict):
     """
     Handles 'customer.subscription.deleted' when a subscription is cancelled or ends.
+    This fires when the subscription period actually ends (after cancel_at_period_end expires).
     """
     stripe_subscription_id = subscription.get('id')
-    user = pocketbase_service.get_user_by_stripe_customer_id(subscription.get('customer'))
-    
+    stripe_customer_id = subscription.get('customer')
+
+    user = pocketbase_service.get_user_by_stripe_customer_id(stripe_customer_id)
+
     if user and user.stripe_subscription_id == stripe_subscription_id:
         update_data = {
             "subscription_status": "cancelled",
-            "active_plan_name": None
+            "active_plan_name": None,
+            "stripe_subscription_id": None  # Clear the subscription ID since it no longer exists
         }
         pocketbase_service.update_user(user.id, update_data)
-        print(f"WEBHOOK-SUCCESS: Marked subscription as 'cancelled' for user {user.id}.")
-
+        print(f"WEBHOOK-SUCCESS: Subscription {stripe_subscription_id} ended for user {user.id}. Status set to 'cancelled'.")
+    elif user:
+        print(f"WEBHOOK-WARN: Subscription ID mismatch for user {user.id}. Expected {user.stripe_subscription_id}, got {stripe_subscription_id}")
+    else:
+        print(f"WEBHOOK-WARN: No user found for deleted subscription {stripe_subscription_id} (customer {stripe_customer_id})")
 
 def handle_subscription_updated(subscription: dict):
     """

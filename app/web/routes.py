@@ -179,3 +179,37 @@ async def cancel_subscription(
         flash(request, "Failed to cancel subscription. Please try again or contact support.", "error")
 
     return RedirectResponse(url="/dashboard", status_code=303)
+
+
+@router.post("/reactivate-subscription", tags=["Web Frontend"])
+async def reactivate_subscription(
+    request: Request,
+    user_token: str = Depends(get_current_user_from_session)
+):
+    """Reactivates a subscription that was set to cancel."""
+    user_id = request.session.get("user_id")
+    if not user_id:
+        flash(request, "You must be logged in to reactivate a subscription.", "error")
+        return RedirectResponse(url="/login", status_code=303)
+
+    user = pocketbase_service.get_user_by_id(user_id)
+
+    # Check if user has a canceling subscription
+    if not user or user.subscription_status != 'canceling':
+        flash(request, "You don't have a subscription to reactivate.", "error")
+        return RedirectResponse(url="/dashboard", status_code=303)
+
+    # Check if the subscription still exists in Stripe (not expired yet)
+    if not user.stripe_subscription_id:
+        flash(request, "Your subscription has already ended and cannot be reactivated. Please subscribe again from the pricing page.", "warning")
+        return RedirectResponse(url="/pricing", status_code=303)
+
+    # Reactivate the subscription via Stripe
+    success = stripe_service.reactivate_subscription(user.stripe_subscription_id)
+
+    if success:
+        flash(request, "Your subscription has been reactivated! It will continue to renew automatically.", "success")
+    else:
+        flash(request, "Failed to reactivate subscription. Please try again or contact support.", "error")
+
+    return RedirectResponse(url="/dashboard", status_code=303)
