@@ -3,7 +3,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
 from app.core.config import settings
-from app.services import stripe_service, pocketbase_service
+from app.services.internal import stripe_service, pocketbase_service
 
 # Initialize the template engine
 templates = Jinja2Templates(directory="app/templates")

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
-from app.services import pocketbase_service
+from app.services.internal import pocketbase_service
 from app.schemas.token import Token
 
 router = APIRouter()

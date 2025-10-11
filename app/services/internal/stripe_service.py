@@ -1,6 +1,6 @@
 import stripe
 from app.core.config import settings
-from app.services import pocketbase_service
+from app.services.internal import pocketbase_service
 
 # Initialize the Stripe client globally
 stripe.api_key = settings.STRIPE_API_KEY

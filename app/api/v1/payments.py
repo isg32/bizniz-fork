@@ -1,7 +1,7 @@
 import stripe
 from fastapi import APIRouter, Request, Header, HTTPException
 from app.core.config import settings
-from app.services import pocketbase_service, email_service
+from app.services.internal import pocketbase_service, email_service
 
 router = APIRouter()
 

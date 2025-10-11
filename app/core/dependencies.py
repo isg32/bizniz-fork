@@ -1,7 +1,7 @@
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from app.services import pocketbase_service
+from app.services.internal import pocketbase_service
 from app.schemas.user import User as UserSchema
 
 # This tells FastAPI where to look for the token in the request

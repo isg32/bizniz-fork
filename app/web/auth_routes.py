@@ -4,7 +4,7 @@ from fastapi.templating import Jinja2Templates
 
 # We need to import the Tmpl dependency from the other route file
 from app.web.routes import Tmpl, flash
-from app.services import pocketbase_service
+from app.services.internal import pocketbase_service
 
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter(tags=["Web Auth"])
