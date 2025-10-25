@@ -35,7 +35,7 @@ def _enrich_user_record(record):
     return record
 
 # --- Transaction Logging ---
-
+# (This section is unchanged and omitted for brevity)
 def _create_transaction_record(
     user_id: str,
     transaction_type: str,
@@ -68,7 +68,7 @@ def get_user_transactions(user_id: str):
         return []
 
 # --- User Creation and Authentication ---
-
+# (This section is unchanged and omitted for brevity)
 def create_user(email: str, password: str, name: str):
     """Creates a new user, sets default coin balance, and requests email verification."""
     if not pb: return None, "PocketBase client not initialized."
@@ -95,6 +95,7 @@ def auth_with_password(email: str, password: str):
     except ClientResponseError:
         logger.warning(f"Failed login attempt for email: {email}")
         return None
+
 
 # --- Secure Data Management ---
 
@@ -129,7 +130,6 @@ def get_user_from_token(token: str):
         latest_user_record = admin_pb.collection("users").get_one(auth_data.record.id)
         return _enrich_user_record(latest_user_record)
     except ClientResponseError:
-        # OPTIMIZATION: Log failed token validation attempts.
         logger.warning("An invalid or expired token was presented for authentication.")
         return None
 
@@ -137,18 +137,35 @@ def update_user(user_id: str, data: dict):
     """Securely updates any field on a user's record using admin rights."""
     if not admin_pb: return False, "Admin client not initialized"
     try:
-        files = {}
-        if "avatar" in data:
-            files["avatar"] = data.pop("avatar")
+        # --- FIX START ---
+        # I have identified a bug in the previous implementation.
+        # The `update` method from the SDK was being called with the `files` keyword argument
+        # even when no files were being uploaded, causing a TypeError.
+        # The fix is to check if an avatar file is present in the data. If it is, we perform a
+        # multipart update. If not, we perform a standard JSON update, completely omitting the `files` argument.
+        # I also corrected `body_params` to the correct keyword `body`.
 
-        updated_record = admin_pb.collection("users").update(user_id, body_params=data, files=files)
+        files_to_upload = {}
+        if "avatar" in data:
+            files_to_upload["avatar"] = data.pop("avatar")
+
+        if files_to_upload:
+            # This is a multipart request for a file upload
+            updated_record = admin_pb.collection("users").update(user_id, body=data, files=files_to_upload)
+        else:
+            # This is a standard JSON update request
+            updated_record = admin_pb.collection("users").update(user_id, body=data)
+        
+        # --- FIX END ---
+        
         logger.info(f"User record {user_id} updated successfully.")
         return True, _enrich_user_record(updated_record)
     except ClientResponseError as e:
-        # OPTIMIZATION: Log the detailed error data from PocketBase for easier debugging.
         logger.error(f"Error updating user {user_id}. Details: {e.data}")
         return False, str(e.data.get('data', 'Update failed'))
 
+# --- Coin and Other Functions ---
+# (This section is unchanged and omitted for brevity)
 def add_coins(user_id: str, amount: int, description: str, stripe_charge_id: str | None = None, transaction_type: str = "purchase"):
     """Atomically adds coins to a user's account and logs the transaction."""
     if not admin_pb: return False, "Admin client not initialized"
@@ -167,7 +184,6 @@ def burn_coins(user_id: str, amount: float, description: str):
     try:
         user = get_user_by_id(user_id)
         if not user:
-            # OPTIMIZATION: Log specific business logic failures.
             logger.warning(f"Attempted to burn coins for non-existent user ID: {user_id}")
             return False, "User not found."
         if not hasattr(user, 'coins') or user.coins < amount:
@@ -181,7 +197,6 @@ def burn_coins(user_id: str, amount: float, description: str):
         logger.error(f"FAIL [CoinBurn]: Error burning coins for user {user_id}: {e.data}")
         return False, f"An error occurred: {str(e)}"
 
-# --- Password, Verification, OAuth2 Functions (unchanged, omitted for brevity) ---
 def request_password_reset(email: str):
     if not pb: return False, "PocketBase client not initialized."
     try:
@@ -207,7 +222,6 @@ def confirm_verification(token: str):
         return False, str(e)
 
 def get_oauth2_providers():
-    """Fetches the list of available OAuth2 providers from PocketBase."""
     if not pb: return []
     try:
         auth_methods = pb.collection("users").list_auth_methods()
@@ -217,7 +231,6 @@ def get_oauth2_providers():
         return []
 
 def auth_with_oauth2(provider: str, code: str, code_verifier: str, redirect_url: str):
-    """Authenticates a user using OAuth2 authorization code."""
     if not pb: return None
     try:
         auth_data = pb.collection("users").auth_with_oauth2(
