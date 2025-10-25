@@ -27,14 +27,13 @@ def init_clients():
         logger.critical(f"FATAL: Could not initialize PocketBase clients. Error: {e}", exc_info=True)
 
 # --- Helper Function ---
-
 def _enrich_user_record(record):
     """Adds computed fields like the full avatar URL to a user record."""
     if record and hasattr(record, 'avatar') and record.avatar:
         record.avatar = f"{settings.POCKETBASE_URL}/api/files/{record.collection_id}/{record.id}/{record.avatar}"
     return record
 
-# --- Transaction Logging (unchanged, omitted for brevity) ---
+# --- Transaction Logging ---
 def _create_transaction_record(
     user_id: str,
     transaction_type: str,
@@ -64,7 +63,7 @@ def get_user_transactions(user_id: str):
         logger.error(f"Error fetching transactions for user {user_id}: {e.data}")
         return []
 
-# --- User Creation and Authentication (unchanged, omitted for brevity) ---
+# --- User Creation and Authentication ---
 def create_user(email: str, password: str, name: str):
     if not pb: return None, "PocketBase client not initialized."
     try:
@@ -91,7 +90,6 @@ def auth_with_password(email: str, password: str):
         return None
 
 # --- Secure Data Management ---
-
 def get_user_by_id(user_id: str):
     if not admin_pb: return None
     try:
@@ -124,29 +122,34 @@ def get_user_from_token(token: str):
         return None
 
 def update_user(user_id: str, data: dict):
-    """Securely updates any field on a user's record using admin rights."""
+    """
+    Securely updates any field on a user's record using admin rights.
+    This single function handles simple data updates AND file uploads correctly.
+    """
     if not admin_pb: return False, "Admin client not initialized"
     try:
-        # --- FINAL FIX ---
-        # The bug is that the pocketbase-python SDK's update method NEVER takes a `files`
-        # keyword argument. It also does not take `body` or `body_params`.
-        # It ONLY accepts the data dictionary as the second positional argument.
-        # The library is smart enough to detect if a file tuple is present in that dictionary
-        # and will automatically create a multipart request.
-        # This single line of code correctly handles ALL cases: simple data updates,
-        # coin updates, and file uploads.
-
+        # --- THE CORRECT AND FINAL IMPLEMENTATION ---
+        # The pocketbase-python SDK's `update` method takes the data dictionary as
+        # the second positional argument. It automatically detects if a value
+        # in the dictionary is a file tuple and builds the multipart request.
+        # There is no `files` keyword argument. This single call works for all cases.
         updated_record = admin_pb.collection("users").update(user_id, data)
-        
-        # --- END OF FIX ---
         
         logger.info(f"User record {user_id} updated successfully.")
         return True, _enrich_user_record(updated_record)
+    
     except ClientResponseError as e:
-        logger.error(f"Error updating user {user_id}. Details: {e.data}")
-        return False, str(e.data.get('data', 'Update failed'))
+        # Log the detailed error from PocketBase if available
+        error_details = e.data if e.data else str(e)
+        logger.error(f"Error updating user {user_id}. Details: {error_details}")
+        return False, str(error_details)
+    except Exception as e:
+        # Catch any other unexpected errors (like TypeErrors)
+        logger.error(f"A non-PocketBase error occurred while updating user {user_id}: {e}", exc_info=True)
+        return False, str(e)
 
-# --- Coin and Other Functions (unchanged, omitted for brevity) ---
+
+# --- Coin and Other Functions ---
 def add_coins(user_id: str, amount: int, description: str, stripe_charge_id: str | None = None, transaction_type: str = "purchase"):
     if not admin_pb: return False, "Admin client not initialized"
     if amount <= 0: return True, "No coins to add."
@@ -175,6 +178,7 @@ def burn_coins(user_id: str, amount: float, description: str):
         logger.error(f"FAIL [CoinBurn]: Error burning coins for user {user_id}: {e.data}")
         return False, f"An error occurred: {str(e)}"
 
+# --- Password, Verification, OAuth2 Functions (Unchanged) ---
 def request_password_reset(email: str):
     if not pb: return False, "PocketBase client not initialized."
     try:
