@@ -1,3 +1,5 @@
+# app/services/internal/pocketbase_service.py
+
 import logging
 from pocketbase import PocketBase
 from pocketbase.utils import ClientResponseError
@@ -22,9 +24,17 @@ def init_clients():
         )
         logger.info("Successfully authenticated PocketBase Admin client.")
     except Exception as e:
-        logger.critical(f"FATAL: Could not initialize PocketBase clients. Error: {e}")
+        logger.critical(f"FATAL: Could not initialize PocketBase clients. Error: {e}", exc_info=True)
 
-# --- Transaction Logging (NEW) ---
+# --- Helper Function ---
+
+def _enrich_user_record(record):
+    """Adds computed fields like the full avatar URL to a user record."""
+    if record and hasattr(record, 'avatar') and record.avatar:
+        record.avatar = f"{settings.POCKETBASE_URL}/api/files/{record.collection_id}/{record.id}/{record.avatar}"
+    return record
+
+# --- Transaction Logging ---
 
 def _create_transaction_record(
     user_id: str,
@@ -38,62 +48,62 @@ def _create_transaction_record(
     if not admin_pb: return
     try:
         data = {
-            "user": user_id,
-            "type": transaction_type,
-            "amount": amount,
-            "description": description,
-            "stripe_charge_id": stripe_charge_id,
-            "metadata": metadata or {}
+            "user": user_id, "type": transaction_type, "amount": amount,
+            "description": description, "stripe_charge_id": stripe_charge_id, "metadata": metadata or {}
         }
         admin_pb.collection("transactions").create(data)
         logger.info(f"TRANSACTION-LOG: User {user_id}, Type: {transaction_type}, Amount: {amount}")
     except ClientResponseError as e:
-        logger.error(f"TRANSACTION-FAIL: Could not log transaction for user {user_id}. Error: {e}")
+        logger.error(f"TRANSACTION-FAIL: Could not log transaction for user {user_id}. Details: {e.data}")
 
 def get_user_transactions(user_id: str):
     """Fetches all transactions for a specific user, sorted by most recent."""
     if not admin_pb: return []
     try:
-        records = admin_pb.collection("transactions").get_full_list(
+        return admin_pb.collection("transactions").get_full_list(
             query_params={"filter": f'user.id="{user_id}"', "sort": "-created"}
         )
-        return records
     except ClientResponseError as e:
-        logger.error(f"Error fetching transactions for user {user_id}: {e}")
+        logger.error(f"Error fetching transactions for user {user_id}: {e.data}")
         return []
 
-# --- User Creation and Authentication (Unchanged) ---
-# ... create_user, auth_with_password functions are unchanged ...
+# --- User Creation and Authentication ---
 
 def create_user(email: str, password: str, name: str):
     """Creates a new user, sets default coin balance, and requests email verification."""
     if not pb: return None, "PocketBase client not initialized."
     try:
-        user_data = { "email": email, "password": password, "passwordConfirm": password, "name": name, "coins": float(settings.FREE_SIGNUP_COINS), "subscription_status": "inactive" }
+        user_data = {
+            "email": email, "password": password, "passwordConfirm": password, "name": name,
+            "coins": float(settings.FREE_SIGN_UP_COINS), "subscription_status": "inactive"
+        }
         record = pb.collection("users").create(user_data)
         pb.collection("users").request_verification(email)
-        # Log the initial bonus coins
-        _create_transaction_record(record.id, "bonus", settings.FREE_SIGNUP_COINS, "Free signup coins")
+        _create_transaction_record(record.id, "bonus", settings.FREE_SIGN_UP_COINS, "Free signup coins")
         return record, None
     except ClientResponseError as e:
-        logger.warning(f"Failed to create user {email}. Error: {e}")
+        logger.warning(f"Failed to create user {email}. Details: {e.data}")
         return None, str(e.data.get('data', 'Unknown error'))
         
 def auth_with_password(email: str, password: str):
     """Authenticates a user with email and password."""
     if not pb: return None
     try:
-        return pb.collection("users").auth_with_password(email, password)
+        auth_data = pb.collection("users").auth_with_password(email, password)
+        auth_data.record = _enrich_user_record(auth_data.record)
+        return auth_data
     except ClientResponseError:
+        logger.warning(f"Failed login attempt for email: {email}")
         return None
 
-# --- Secure Data Management (Updated) ---
+# --- Secure Data Management ---
 
 def get_user_by_id(user_id: str):
     """Fetches a single, complete user record by their ID using admin rights."""
     if not admin_pb: return None
     try:
-        return admin_pb.collection("users").get_one(user_id)
+        record = admin_pb.collection("users").get_one(user_id)
+        return _enrich_user_record(record)
     except ClientResponseError:
         return None
         
@@ -101,13 +111,12 @@ def get_user_by_stripe_customer_id(customer_id: str):
     """Fetches a user record by their Stripe Customer ID."""
     if not admin_pb: return None
     try:
-        # Use get_full_list with filter instead of get_list
         records = admin_pb.collection("users").get_full_list(
             query_params={"filter": f'stripe_customer_id = "{customer_id}"'}
         )
-        return records[0] if records else None
+        return _enrich_user_record(records[0]) if records else None
     except ClientResponseError as e:
-        logger.error(f"Error fetching user by stripe_customer_id={customer_id}: {e}")
+        logger.error(f"Error fetching user by stripe_customer_id={customer_id}: {e.data}")
         return None
 
 def get_user_from_token(token: str):
@@ -118,19 +127,27 @@ def get_user_from_token(token: str):
         temp_client.auth_store.save(token, None)
         auth_data = temp_client.collection("users").auth_refresh()
         latest_user_record = admin_pb.collection("users").get_one(auth_data.record.id)
-        return latest_user_record
+        return _enrich_user_record(latest_user_record)
     except ClientResponseError:
+        # OPTIMIZATION: Log failed token validation attempts.
+        logger.warning("An invalid or expired token was presented for authentication.")
         return None
 
 def update_user(user_id: str, data: dict):
     """Securely updates any field on a user's record using admin rights."""
     if not admin_pb: return False, "Admin client not initialized"
     try:
-        admin_pb.collection("users").update(user_id, data)
-        return True, "User updated successfully"
+        files = {}
+        if "avatar" in data:
+            files["avatar"] = data.pop("avatar")
+
+        updated_record = admin_pb.collection("users").update(user_id, body_params=data, files=files)
+        logger.info(f"User record {user_id} updated successfully.")
+        return True, _enrich_user_record(updated_record)
     except ClientResponseError as e:
-        logger.error(f"Error updating user {user_id}: {e}")
-        return False, str(e)
+        # OPTIMIZATION: Log the detailed error data from PocketBase for easier debugging.
+        logger.error(f"Error updating user {user_id}. Details: {e.data}")
+        return False, str(e.data.get('data', 'Update failed'))
 
 def add_coins(user_id: str, amount: int, description: str, stripe_charge_id: str | None = None, transaction_type: str = "purchase"):
     """Atomically adds coins to a user's account and logs the transaction."""
@@ -141,7 +158,7 @@ def add_coins(user_id: str, amount: int, description: str, stripe_charge_id: str
         _create_transaction_record(user_id, transaction_type, amount, description, stripe_charge_id)
         return True, "Coins added successfully"
     except ClientResponseError as e:
-        logger.error(f"FAIL [CoinUpdate]: Error adding coins for user {user_id}: {e}")
+        logger.error(f"FAIL [CoinAddition]: Error adding coins for user {user_id}: {e.data}")
         return False, str(e)
 
 def burn_coins(user_id: str, amount: float, description: str):
@@ -149,17 +166,22 @@ def burn_coins(user_id: str, amount: float, description: str):
     if not admin_pb: return False, "Admin client not initialized"
     try:
         user = get_user_by_id(user_id)
-        if not user: return False, "User not found."
+        if not user:
+            # OPTIMIZATION: Log specific business logic failures.
+            logger.warning(f"Attempted to burn coins for non-existent user ID: {user_id}")
+            return False, "User not found."
         if not hasattr(user, 'coins') or user.coins < amount:
+            logger.warning(f"Insufficient funds for user {user_id}. Has: {user.coins}, needs: {amount}")
             return False, "Insufficient coins."
+            
         admin_pb.collection("users").update(user_id, {"coins-": amount})
         _create_transaction_record(user_id, "spend", -amount, description)
         return True, f"Successfully burned {amount} coins."
     except ClientResponseError as e:
+        logger.error(f"FAIL [CoinBurn]: Error burning coins for user {user_id}: {e.data}")
         return False, f"An error occurred: {str(e)}"
 
-# --- Password, Verification Functions (Unchanged) ---
-# ... request_password_reset, confirm_password_reset, confirm_verification are unchanged ...
+# --- Password, Verification, OAuth2 Functions (unchanged, omitted for brevity) ---
 def request_password_reset(email: str):
     if not pb: return False, "PocketBase client not initialized."
     try:
@@ -184,8 +206,6 @@ def confirm_verification(token: str):
     except ClientResponseError as e:
         return False, str(e)
 
-# --- OAuth2 Functions ---
-
 def get_oauth2_providers():
     """Fetches the list of available OAuth2 providers from PocketBase."""
     if not pb: return []
@@ -197,28 +217,18 @@ def get_oauth2_providers():
         return []
 
 def auth_with_oauth2(provider: str, code: str, code_verifier: str, redirect_url: str):
-    """
-    Authenticates a user using OAuth2 authorization code.
-    Returns the auth data on success, None on failure.
-    """
+    """Authenticates a user using OAuth2 authorization code."""
     if not pb: return None
     try:
         auth_data = pb.collection("users").auth_with_oauth2(
-            provider=provider,
-            code=code,
-            code_verifier=code_verifier,
-            redirect_url=redirect_url
+            provider=provider, code=code, code_verifier=code_verifier, redirect_url=redirect_url
         )
-
-        # If this is a new user (first OAuth login), give them signup bonus
         user_id = auth_data.record.id
         user = get_user_by_id(user_id)
-
-        # Check if user has no coins (new user)
         if user and (not hasattr(user, 'coins') or user.coins == 0):
             add_coins(user_id, settings.FREE_SIGNUP_COINS, "Free signup coins via OAuth", transaction_type="bonus")
             logger.info(f"New OAuth user {user_id} received signup bonus")
-
+        auth_data.record = user
         return auth_data
     except ClientResponseError as e:
         logger.error(f"OAuth2 authentication failed: {e}")

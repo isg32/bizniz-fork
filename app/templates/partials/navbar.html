@@ -25,9 +25,17 @@
                         <div>
                             <button @click="userMenuOpen = !userMenuOpen" type="button" class="flex text-sm bg-slate-200 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500" id="user-menu-button">
                                 <span class="sr-only">Open user menu</span>
-                                <div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">
-                                    <span class="text-sm font-bold">{{ current_user.name[0]|upper if current_user.name else 'U' }}</span>
-                                </div>
+                                
+                                <!-- MODIFICATION START: Conditional Avatar Display -->
+                                {% if current_user.avatar %}
+                                    <img class="h-8 w-8 rounded-full object-cover" src="{{ current_user.avatar }}" alt="User Avatar">
+                                {% else %}
+                                    <div class="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center">
+                                        <span class="text-sm font-bold">{{ current_user.name[0]|upper if current_user.name else 'U' }}</span>
+                                    </div>
+                                {% endif %}
+                                <!-- MODIFICATION END -->
+
                             </button>
                         </div>
                         <div x-show="userMenuOpen"

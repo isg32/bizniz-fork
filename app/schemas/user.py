@@ -1,3 +1,4 @@
+# app/schemas/user.py
 
 from pydantic import BaseModel, EmailStr
 
@@ -15,6 +16,9 @@ class User(UserBase):
     id: str
     coins: float = 0.0
     subscription_status: str = "inactive"
+    
+    # --- NEW: Add optional avatar URL field ---
+    avatar: str | None = None
 
     class Config:
         from_attributes = True # Pydantic v2 replaces orm_mode

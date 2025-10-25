@@ -1,5 +1,7 @@
+# app/core/config.py
+
 import httpx
-import json # <-- Import the json library
+import json
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -17,21 +19,18 @@ def fetch_remote_config(url: str, api_key: str) -> dict:
         response = httpx.get(url, headers=headers, timeout=5)
         response.raise_for_status()
         print("--> Remote configuration fetched successfully.")
-        # NEW: Explicitly handle JSON decoding to provide a better error message
         return response.json()
     except httpx.RequestError as e:
         raise RuntimeError(f"FATAL: Could not fetch remote configuration. Network error: {e}") from e
     except httpx.HTTPStatusError as e:
         raise RuntimeError(f"FATAL: Could not fetch remote configuration. Status code: {e.response.status_code}") from e
-    except json.JSONDecodeError: # <-- CATCH THE SPECIFIC ERROR
+    except json.JSONDecodeError:
         raise RuntimeError(
             "FATAL: Remote config server responded successfully, but the response body was NOT valid JSON. "
             "Please verify the server is returning a correctly formatted JSON object."
         )
 
 
-# The rest of the file is unchanged.
-# --- NEW: A separate class for bootstrapping ---
 class BootstrapSettings(BaseSettings):
     """Loads ONLY the variables needed to connect to the remote secret manager."""
     DOTENV_SERVER_URL: str
@@ -54,6 +53,10 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
     ELEVENLABS_API_KEY: str
     RESEND_API_KEY: str
+    
+    # --- NEW: Secret token for securing internal APIs ---
+    INTERNAL_API_SECRET_TOKEN: str
+
     PROJECT_NAME: str = "munni.ai"
     API_V1_STR: str = "/api/v1"
     CREDIT_UNIT_NAME: str = "Coin"
