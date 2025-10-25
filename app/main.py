@@ -13,7 +13,6 @@ from app.web import auth_routes as web_auth_routes
 # --- Service Client Imports for Initialization ---
 from app.services.internal import pocketbase_service
 # Import the single, shared instance of our new Gemini client
-from app.services.clients.gemini import gemini_client
 
 
 @asynccontextmanager
@@ -28,12 +27,6 @@ async def lifespan(app: FastAPI):
     # Initialize your internal services
     pocketbase_service.init_clients()
     print("PocketBase clients initialized.")
-    
-    # Initialize the unified Gemini client
-    gemini_client.init_app()
-    
-    print("Service initialization complete. Application is ready.")
-    
     yield  # --- The application runs here ---
     
     # --- Code to run on shutdown ---
