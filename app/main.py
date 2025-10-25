@@ -1,8 +1,11 @@
+# app/main.py
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
+import ssl # ✅ IMPORT the ssl module
 
 # --- Application Imports ---
 from app.core.config import settings
@@ -12,17 +15,27 @@ from app.web import auth_routes as web_auth_routes
 
 # --- Service Client Imports for Initialization ---
 from app.services.internal import pocketbase_service
-# Import the single, shared instance of our new Gemini client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Manages application startup and shutdown events.
-    This is the recommended modern way to handle initialization.
     """
     # --- Code to run on startup ---
     print("Initializing services...")
+
+    # --- ✅ THE SSL FIX ---
+    # Globally disable SSL certificate verification for the entire app process.
+    # This is required to connect to the custom domain `pb.bugswriter.ai`.
+    print("Applying global SSL unverified context for PocketBase connection...")
+    try:
+        _create_unverified_https_context = ssl._create_unverified_context
+    except AttributeError:
+        pass # For legacy Python versions
+    else:
+        ssl._create_default_https_context = _create_unverified_https_context
+    # --- END OF FIX ---
 
     # Initialize your internal services
     pocketbase_service.init_clients()
@@ -37,20 +50,14 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title=settings.PROJECT_NAME,
     openapi_url=f"{settings.API_V1_STR}/openapi.json",
-    lifespan=lifespan  # Wire up the lifespan manager
+    lifespan=lifespan
 )
 
 # --- Middleware ---
-# IMPORTANT: Middleware is processed in the order it's added.
-# SessionMiddleware MUST come first to make `request.session` available.
-app.add_middleware(
-    SessionMiddleware,
-    secret_key=settings.SECRET_KEY
-)
-
+app.add_middleware(SessionMiddleware, secret_key=settings.SECRET_KEY)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to your domain
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
