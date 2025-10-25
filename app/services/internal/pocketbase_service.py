@@ -34,8 +34,7 @@ def _enrich_user_record(record):
         record.avatar = f"{settings.POCKETBASE_URL}/api/files/{record.collection_id}/{record.id}/{record.avatar}"
     return record
 
-# --- Transaction Logging ---
-# (This section is unchanged and omitted for brevity)
+# --- Transaction Logging (unchanged, omitted for brevity) ---
 def _create_transaction_record(
     user_id: str,
     transaction_type: str,
@@ -44,7 +43,6 @@ def _create_transaction_record(
     stripe_charge_id: str | None = None,
     metadata: dict | None = None
 ):
-    """Internal helper to create a record in the 'transactions' collection."""
     if not admin_pb: return
     try:
         data = {
@@ -57,7 +55,6 @@ def _create_transaction_record(
         logger.error(f"TRANSACTION-FAIL: Could not log transaction for user {user_id}. Details: {e.data}")
 
 def get_user_transactions(user_id: str):
-    """Fetches all transactions for a specific user, sorted by most recent."""
     if not admin_pb: return []
     try:
         return admin_pb.collection("transactions").get_full_list(
@@ -67,10 +64,8 @@ def get_user_transactions(user_id: str):
         logger.error(f"Error fetching transactions for user {user_id}: {e.data}")
         return []
 
-# --- User Creation and Authentication ---
-# (This section is unchanged and omitted for brevity)
+# --- User Creation and Authentication (unchanged, omitted for brevity) ---
 def create_user(email: str, password: str, name: str):
-    """Creates a new user, sets default coin balance, and requests email verification."""
     if not pb: return None, "PocketBase client not initialized."
     try:
         user_data = {
@@ -86,7 +81,6 @@ def create_user(email: str, password: str, name: str):
         return None, str(e.data.get('data', 'Unknown error'))
         
 def auth_with_password(email: str, password: str):
-    """Authenticates a user with email and password."""
     if not pb: return None
     try:
         auth_data = pb.collection("users").auth_with_password(email, password)
@@ -96,11 +90,9 @@ def auth_with_password(email: str, password: str):
         logger.warning(f"Failed login attempt for email: {email}")
         return None
 
-
 # --- Secure Data Management ---
 
 def get_user_by_id(user_id: str):
-    """Fetches a single, complete user record by their ID using admin rights."""
     if not admin_pb: return None
     try:
         record = admin_pb.collection("users").get_one(user_id)
@@ -109,7 +101,6 @@ def get_user_by_id(user_id: str):
         return None
         
 def get_user_by_stripe_customer_id(customer_id: str):
-    """Fetches a user record by their Stripe Customer ID."""
     if not admin_pb: return None
     try:
         records = admin_pb.collection("users").get_full_list(
@@ -121,7 +112,6 @@ def get_user_by_stripe_customer_id(customer_id: str):
         return None
 
 def get_user_from_token(token: str):
-    """Validates a user's auth token and returns their LATEST user record."""
     if not admin_pb: return None
     try:
         temp_client = PocketBase(settings.POCKETBASE_URL)
@@ -137,26 +127,25 @@ def update_user(user_id: str, data: dict):
     """Securely updates any field on a user's record using admin rights."""
     if not admin_pb: return False, "Admin client not initialized"
     try:
-        # --- FIX START ---
-        # I have identified a bug in the previous implementation.
-        # The `update` method from the SDK was being called with the `files` keyword argument
-        # even when no files were being uploaded, causing a TypeError.
-        # The fix is to check if an avatar file is present in the data. If it is, we perform a
-        # multipart update. If not, we perform a standard JSON update, completely omitting the `files` argument.
-        # I also corrected `body_params` to the correct keyword `body`.
+        # --- DEFINITIVE FIX START ---
+        # The bug from the logs is `TypeError: RecordService.update() got an unexpected keyword argument 'body'`.
+        # This confirms the pocketbase-python SDK's `update` method does not use a `body` keyword.
+        # The data dictionary must be passed as the second POSITIONAL argument.
+        # The `files` argument, however, IS a keyword argument.
+        # The corrected logic below handles both cases correctly.
 
         files_to_upload = {}
         if "avatar" in data:
             files_to_upload["avatar"] = data.pop("avatar")
 
         if files_to_upload:
-            # This is a multipart request for a file upload
-            updated_record = admin_pb.collection("users").update(user_id, body=data, files=files_to_upload)
+            # For file uploads, pass data as positional and files as keyword.
+            updated_record = admin_pb.collection("users").update(user_id, data, files=files_to_upload)
         else:
-            # This is a standard JSON update request
-            updated_record = admin_pb.collection("users").update(user_id, body=data)
+            # For regular updates, pass data as a positional argument ONLY.
+            updated_record = admin_pb.collection("users").update(user_id, data)
         
-        # --- FIX END ---
+        # --- DEFINITIVE FIX END ---
         
         logger.info(f"User record {user_id} updated successfully.")
         return True, _enrich_user_record(updated_record)
@@ -164,10 +153,8 @@ def update_user(user_id: str, data: dict):
         logger.error(f"Error updating user {user_id}. Details: {e.data}")
         return False, str(e.data.get('data', 'Update failed'))
 
-# --- Coin and Other Functions ---
-# (This section is unchanged and omitted for brevity)
+# --- Coin and Other Functions (unchanged, omitted for brevity) ---
 def add_coins(user_id: str, amount: int, description: str, stripe_charge_id: str | None = None, transaction_type: str = "purchase"):
-    """Atomically adds coins to a user's account and logs the transaction."""
     if not admin_pb: return False, "Admin client not initialized"
     if amount <= 0: return True, "No coins to add."
     try:
@@ -179,7 +166,6 @@ def add_coins(user_id: str, amount: int, description: str, stripe_charge_id: str
         return False, str(e)
 
 def burn_coins(user_id: str, amount: float, description: str):
-    """Securely deducts coins, logs the transaction."""
     if not admin_pb: return False, "Admin client not initialized"
     try:
         user = get_user_by_id(user_id)
@@ -189,7 +175,6 @@ def burn_coins(user_id: str, amount: float, description: str):
         if not hasattr(user, 'coins') or user.coins < amount:
             logger.warning(f"Insufficient funds for user {user_id}. Has: {user.coins}, needs: {amount}")
             return False, "Insufficient coins."
-            
         admin_pb.collection("users").update(user_id, {"coins-": amount})
         _create_transaction_record(user_id, "spend", -amount, description)
         return True, f"Successfully burned {amount} coins."
