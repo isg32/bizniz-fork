@@ -127,25 +127,18 @@ def update_user(user_id: str, data: dict):
     """Securely updates any field on a user's record using admin rights."""
     if not admin_pb: return False, "Admin client not initialized"
     try:
-        # --- DEFINITIVE FIX START ---
-        # The bug from the logs is `TypeError: RecordService.update() got an unexpected keyword argument 'body'`.
-        # This confirms the pocketbase-python SDK's `update` method does not use a `body` keyword.
-        # The data dictionary must be passed as the second POSITIONAL argument.
-        # The `files` argument, however, IS a keyword argument.
-        # The corrected logic below handles both cases correctly.
+        # --- FINAL FIX ---
+        # The bug is that the pocketbase-python SDK's update method NEVER takes a `files`
+        # keyword argument. It also does not take `body` or `body_params`.
+        # It ONLY accepts the data dictionary as the second positional argument.
+        # The library is smart enough to detect if a file tuple is present in that dictionary
+        # and will automatically create a multipart request.
+        # This single line of code correctly handles ALL cases: simple data updates,
+        # coin updates, and file uploads.
 
-        files_to_upload = {}
-        if "avatar" in data:
-            files_to_upload["avatar"] = data.pop("avatar")
-
-        if files_to_upload:
-            # For file uploads, pass data as positional and files as keyword.
-            updated_record = admin_pb.collection("users").update(user_id, data, files=files_to_upload)
-        else:
-            # For regular updates, pass data as a positional argument ONLY.
-            updated_record = admin_pb.collection("users").update(user_id, data)
+        updated_record = admin_pb.collection("users").update(user_id, data)
         
-        # --- DEFINITIVE FIX END ---
+        # --- END OF FIX ---
         
         logger.info(f"User record {user_id} updated successfully.")
         return True, _enrich_user_record(updated_record)
