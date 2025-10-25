@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     # Core App Settings
     SECRET_KEY: str
-    PROJECT_NAME: str = "Bizniz AI"
+    PROJECT_NAME: str = "Munni AI"
     API_V1_STR: str = "/api/v1"
 
     # PocketBase Settings

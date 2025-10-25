@@ -4,4 +4,4 @@
 // - Interactive charts
 // - Custom UI element behaviors
 
-console.log("Bizniz AI main.js loaded.");
+console.log("Munni AI main.js loaded.");

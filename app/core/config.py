@@ -54,7 +54,7 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str
     ELEVENLABS_API_KEY: str
     RESEND_API_KEY: str
-    PROJECT_NAME: str = "Bizniz AI"
+    PROJECT_NAME: str = "munni.ai"
     API_V1_STR: str = "/api/v1"
     CREDIT_UNIT_NAME: str = "Coin"
     CREDIT_UNIT_NAME_PLURAL: str = "Coins"

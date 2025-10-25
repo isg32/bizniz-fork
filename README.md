@@ -1,6 +1,6 @@
-# Bizniz AI - FastAPI Business Platform
+# Munni AI - FastAPI Business Platform
 
-Welcome to Bizniz AI, a robust SaaS boilerplate built with a modern Python stack. This project provides a complete foundation for building a business around a coin-based API, including a professional website, user authentication, a payment system, and a secure API for external applications.
+Welcome to Munni AI, a robust SaaS boilerplate built with a modern Python stack. This project provides a complete foundation for building a business around a coin-based API, including a professional website, user authentication, a payment system, and a secure API for external applications.
 
 ### ✨ Features
 
