@@ -75,11 +75,11 @@ def create_user(email: str, password: str, name: str):
     try:
         user_data = {
             "email": email, "password": password, "passwordConfirm": password, "name": name,
-            "coins": float(settings.FREE_SIGN_UP_COINS), "subscription_status": "inactive"
+            "coins": float(settings.FREE_SIGNUP_COINS), "subscription_status": "inactive"
         }
         record = pb.collection("users").create(user_data)
         pb.collection("users").request_verification(email)
-        _create_transaction_record(record.id, "bonus", settings.FREE_SIGN_UP_COINS, "Free signup coins")
+        _create_transaction_record(record.id, "bonus", settings.FREE_SIGNUP_COINS, "Free signup coins")
         return record, None
     except ClientResponseError as e:
         logger.warning(f"Failed to create user {email}. Details: {e.data}")
