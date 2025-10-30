@@ -24,9 +24,9 @@
             <p>Hi {{ user_name }},</p>
             <p>This email confirms that your <strong>{{ plan_name }}</strong> subscription for {{ project_name }} has been successfully cancelled.</p>
             <p><strong>Your plan will remain active, and you can continue to use its benefits until the end of your current billing period.</strong> After that, your account will revert to a free plan.</p>
-            <p>If you cancelled by mistake or change your mind, you can reactivate your subscription from your dashboard before the billing period ends.</p>
+            <p>If you cancelled by mistake or change your mind, you can manage your subscription and payment methods in the billing portal.</p>
             <p style="text-align: center; margin-top: 30px; margin-bottom: 30px;">
-                <a href="{{ request.base_url }}dashboard" class="button">Visit Dashboard</a>
+                <a href="{{ request.base_url }}customer-portal" class="button">Open Billing Portal</a>
             </p>
             <p>We're sorry to see you go and hope to see you back soon.</p>
             <p>Best regards,<br>The {{ project_name }} Team</p>

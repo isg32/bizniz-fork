@@ -92,26 +92,7 @@
 
             <!-- Right Column -->
             <div class="lg:col-span-1 space-y-8">
-                {% if current_user.subscription_status == 'active' %}
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <h3 class="font-medium text-slate-900">Manage Subscription</h3>
-                    <p class="text-sm text-slate-500 mt-2">Cancel your plan at any time. You'll keep access until the end of your billing period.</p>
-                    <button onclick="document.getElementById('cancel_subscription_modal').showModal()" class="mt-4 w-full text-center rounded-md bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-100">
-                        Cancel Subscription
-                    </button>
-                </div>
-                {% elif current_user.subscription_status == 'canceling' %}
-                <div class="bg-white p-6 rounded-lg shadow-sm border-2 border-amber-300">
-                    <h3 class="font-medium text-amber-800">Subscription Canceling</h3>
-                    <p class="text-sm text-amber-700 mt-2">Your plan will cancel at the end of your billing period. Changed your mind?</p>
-                    <form action="/reactivate-subscription" method="POST" class="mt-4">
-                        <button type="submit" class="w-full text-center rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-                            Reactivate Subscription
-                        </button>
-                    </form>
-                </div>
-                {% endif %}
-                 <!-- Manage Billing -->
+                <!-- Manage Billing -->
                 <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
                     <h3 class="font-medium text-slate-900">Manage Billing</h3>
                     <p class="text-sm text-slate-500 mt-2">Update your payment methods and view past invoices.</p>
@@ -123,20 +104,4 @@
         </div>
     </div>
 </div>
-
-<!-- Cancel Subscription Confirmation Modal -->
-<dialog id="cancel_subscription_modal" class="p-0 rounded-lg shadow-xl max-w-sm">
-    <div class="p-6">
-        <h3 class="font-bold text-lg text-slate-900">Cancel Subscription?</h3>
-        <p class="py-4 text-slate-600">Are you sure? You will keep access until the end of your current billing period.</p>
-        <div class="flex justify-end gap-4 mt-4">
-            <form method="dialog">
-                <button class="rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-200">Keep Plan</button>
-            </form>
-            <form action="/cancel-subscription" method="POST">
-                <button type="submit" class="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Yes, Cancel</button>
-            </form>
-        </div>
-    </div>
-</dialog>
 {% endblock %}
