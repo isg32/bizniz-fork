@@ -20,25 +20,31 @@ def flash(request: Request, message: str, category: str = "info"):
 
 async def Tmpl(request: Request):
     """
-    The correct dependency for rendering templates.
-    It gathers all necessary global context variables.
+    Enhanced template dependency with session validation.
     """
-    # 1. Get user from session
     current_user = None
     user_token = request.session.get("user_token")
-    if user_token:
-        current_user = pocketbase_service.get_user_from_token(user_token)
-        if not current_user:
-            request.session.clear()  # Clear invalid session
+    user_id_in_session = request.session.get("user_id")
 
-    # 2. Return the complete context dictionary
+    if user_token and user_id_in_session:
+        # Get user from token
+        current_user = pocketbase_service.get_user_from_token(user_token)
+
+        # ✅ CRITICAL FIX: Validate that the token's user matches the session's user_id
+        if current_user:
+            if current_user.id != user_id_in_session:
+                request.session.clear()
+                current_user = None
+        else:
+            # Token is invalid or expired
+            request.session.clear()
+
     return {
         "request": request,
         "settings": settings,
         "current_user": current_user,
         "flash_messages": request.session.pop("flash_messages", [])
     }
-
 
 # --- Web Page Routes ---
 
