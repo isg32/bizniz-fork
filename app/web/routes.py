@@ -141,6 +141,11 @@ async def create_checkout_session(
             flash(request, "You already have an active subscription. Please manage it from your dashboard.", "warning")
             return RedirectResponse(url="/dashboard", status_code=303)
 
+    if mode == "payment":
+        if user and hasattr(user, 'subscription_status') and user.subscription_status == 'active':
+            flash(request, "One-time purchases are disabled while you have an active subscription.", "warning")
+            return RedirectResponse(url="/dashboard", status_code=303)
+
     session = stripe_service.create_checkout_session(price_id, user_id, request, mode)
 
     if session and session.url:

@@ -41,12 +41,12 @@ def get_all_active_products_and_prices():
                 subscription_plans.append(item)
             else:
                 one_time_packs.append(item)
-        
+
         one_time_packs.sort(key=lambda x: x['price'])
         subscription_plans.sort(key=lambda x: x['price'])
-        
+
         return subscription_plans, one_time_packs
-        
+
     except Exception as e:
         print(f"Stripe API error fetching products: {e}")
         return [], []
@@ -62,7 +62,7 @@ def create_checkout_session(price_id: str, user_id: str, request: object, mode: 
     try:
         base_url = str(request.base_url)
         user = pocketbase_service.get_user_by_id(user_id)
-        
+
         session_params = {
             'payment_method_types': ['card'],
             'line_items': [{'price': price_id, 'quantity': 1}],
@@ -71,7 +71,7 @@ def create_checkout_session(price_id: str, user_id: str, request: object, mode: 
             'cancel_url': f"{base_url}pricing?payment=cancelled",
             'client_reference_id': user_id,
         }
-        
+
         if user and hasattr(user, 'stripe_customer_id') and user.stripe_customer_id:
             session_params['customer'] = user.stripe_customer_id
         elif user:
