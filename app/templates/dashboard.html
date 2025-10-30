@@ -29,6 +29,9 @@
                                 <div>
                                     <p class="text-sm font-medium text-slate-500">{{ settings.CREDIT_UNIT_NAME_PLURAL }} Balance</p>
                                     <p class="text-3xl font-bold text-indigo-600 mt-1">{{ "%.0f"|format(current_user.coins|float) }}</p>
+                                    {% if not current_user or current_user.subscription_status != 'active' %}
+                                    <p class="mt-2 text-sm text-amber-700">Note: Your credits will only be accessible when your subscription is active.</p>
+                                    {% endif %}
                                 </div>
                                 <div class="p-2 bg-amber-100 rounded-md">
                                     <i class="fa-solid fa-coins fa-lg text-amber-500"></i>

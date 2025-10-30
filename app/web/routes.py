@@ -149,3 +149,4 @@ async def create_checkout_session(
         flash(request, "Could not create a payment session. Please try again.", "error")
         return RedirectResponse(url="/pricing", status_code=303)
 
+
