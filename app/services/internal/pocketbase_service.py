@@ -79,7 +79,7 @@ def create_user(email: str, password: str, name: str):
     except ClientResponseError as e:
         logger.warning(f"Failed to create user {email}. Details: {e.data}")
         return None, str(e.data.get('data', 'Unknown error'))
-        
+
 def auth_with_password(email: str, password: str):
     if not pb: return None
     try:
@@ -98,7 +98,7 @@ def get_user_by_id(user_id: str):
         return _enrich_user_record(record)
     except ClientResponseError:
         return None
-        
+
 def get_user_by_stripe_customer_id(customer_id: str):
     if not admin_pb: return None
     try:
@@ -141,10 +141,10 @@ def update_user(user_id: str, data: dict):
         # The rest of the call is simple. The library handles the multipart logic.
         updated_record = admin_pb.collection("users").update(user_id, data_to_send)
         # --- END OF FIX ---
-        
+
         logger.info(f"User record {user_id} updated successfully.")
         return True, _enrich_user_record(updated_record)
-    
+
     except ClientResponseError as e:
         error_details = e.data if e.data else str(e)
         logger.error(f"Error updating user {user_id}. Details: {error_details}")
@@ -218,19 +218,76 @@ def get_oauth2_providers():
         logger.error(f"Error fetching OAuth2 providers: {e}")
         return []
 
-def auth_with_oauth2(provider: str, code: str, code_verifier: str, redirect_url: str):
-    if not pb: return None
+
+# app/services/internal/pocketbase_service.py - OAuth Function Fix
+def auth_with_oauth2(provider: str, code: str, code_verifier: str, redirect_url: str, pb_state: str = None):
+    """
+    Authenticates a user via OAuth2 and ensures proper user isolation.
+
+    Args:
+        provider: OAuth provider name (e.g., 'google', 'github')
+        code: Authorization code from OAuth provider
+        code_verifier: PKCE code verifier
+        redirect_url: The redirect URL (must match what's registered)
+        pb_state: PocketBase's original state (optional, for internal use)
+    """
+    if not pb:
+        logger.error("PocketBase client not initialized for OAuth")
+        return None
+
     try:
-        auth_data = pb.collection("users").auth_with_oauth2(
-            provider=provider, code=code, code_verifier=code_verifier, redirect_url=redirect_url
+        # ✅ FIX 1: Create a NEW isolated PocketBase client for this OAuth attempt
+        # This prevents token conflicts when multiple users authenticate simultaneously
+        oauth_client = PocketBase(settings.POCKETBASE_URL)
+
+        # ✅ FIX 2: Perform OAuth authentication with the isolated client
+        # Note: We don't pass pb_state to PocketBase SDK - it's only for our tracking
+        auth_data = oauth_client.collection("users").auth_with_oauth2(
+            provider=provider,
+            code=code,
+            code_verifier=code_verifier,
+            redirect_url=redirect_url
         )
+
+        # ✅ FIX 3: Immediately extract the user ID BEFORE any other operations
         user_id = auth_data.record.id
+        user_email = auth_data.record.email
+
+        logger.info(f"OAuth2 authentication successful for user {user_id} ({user_email}) via {provider}")
+
+        # ✅ FIX 4: Get the complete user record using admin client for accuracy
         user = get_user_by_id(user_id)
-        if user and (not hasattr(user, 'coins') or user.coins == 0):
-            add_coins(user_id, settings.FREE_SIGNUP_COINS, "Free signup coins via OAuth", transaction_type="bonus")
-            logger.info(f"New OAuth user {user_id} received signup bonus")
+
+        if not user:
+            logger.error(f"Critical: OAuth user {user_id} authenticated but record not found")
+            return None
+
+        # ✅ FIX 5: Check if this is a new user (no coins or zero coins)
+        is_new_user = not hasattr(user, 'coins') or user.coins == 0
+
+        if is_new_user:
+            success, msg = add_coins(
+                user_id,
+                settings.FREE_SIGNUP_COINS,
+                "Free signup coins via OAuth",
+                transaction_type="bonus"
+            )
+            if success:
+                logger.info(f"New OAuth user {user_id} received {settings.FREE_SIGNUP_COINS} signup bonus")
+            else:
+                logger.warning(f"Failed to add signup bonus for new OAuth user {user_id}: {msg}")
+
+            # Refresh the user record after adding coins
+            user = get_user_by_id(user_id)
+
+        # ✅ FIX 6: Return the auth data with the verified user record
         auth_data.record = user
+
         return auth_data
+
     except ClientResponseError as e:
-        logger.error(f"OAuth2 authentication failed: {e}")
+        logger.error(f"OAuth2 authentication failed for provider {provider}: {e.data}")
+        return None
+    except Exception as e:
+        logger.error(f"Unexpected error during OAuth2 authentication: {e}", exc_info=True)
         return None

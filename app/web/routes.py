@@ -20,36 +20,31 @@ def flash(request: Request, message: str, category: str = "info"):
 
 async def Tmpl(request: Request):
     """
-    The correct dependency for rendering templates.
-    It gathers all necessary global context variables.
+    Enhanced template dependency with session validation.
     """
-    # 1. Get user from session
     current_user = None
     user_token = request.session.get("user_token")
-    if user_token:
-        current_user = pocketbase_service.get_user_from_token(user_token)
-        if not current_user:
-            request.session.clear() # Clear invalid session
+    user_id_in_session = request.session.get("user_id")
 
-    # 2. Return the complete context dictionary
+    if user_token and user_id_in_session:
+        # Get user from token
+        current_user = pocketbase_service.get_user_from_token(user_token)
+
+        # ✅ CRITICAL FIX: Validate that the token's user matches the session's user_id
+        if current_user:
+            if current_user.id != user_id_in_session:
+                request.session.clear()
+                current_user = None
+        else:
+            # Token is invalid or expired
+            request.session.clear()
+
     return {
         "request": request,
         "settings": settings,
         "current_user": current_user,
         "flash_messages": request.session.pop("flash_messages", [])
     }
-
-
-def get_current_user_from_session(request: Request):
-    """
-    Dependency to protect routes by checking for a user in the session.
-    If not found, it redirects to the login page.
-    """
-    if not request.session.get("user_token"):
-        flash(request, "You need to be logged in to view that page.", "warning")
-        return RedirectResponse(url="/login", status_code=303)
-    return request.session.get("user_token")
-
 
 # --- Web Page Routes ---
 
@@ -60,37 +55,39 @@ async def index(request: Request, context: dict = Depends(Tmpl)):
 
 
 @router.get("/dashboard", response_class=HTMLResponse, tags=["Web Frontend"])
-async def dashboard(
-    request: Request,
-    context: dict = Depends(Tmpl),
-    user_token: str = Depends(get_current_user_from_session)
-):
+async def dashboard(request: Request, context: dict = Depends(Tmpl)):
     """Serves the user dashboard with transaction history."""
+
+    # --- ✅ ADDED: Correct auth check ---
+    current_user = context.get("current_user")
+    if not current_user:
+        flash(request, "You must be logged in to view the dashboard.", "warning")
+        return RedirectResponse(url="/login", status_code=303)
+    # --- End of fix ---
+
     payment_status = request.query_params.get("payment")
     if payment_status == "success":
         flash(request, "Your purchase was successful! Your account has been updated.", "success")
-    
-    user_id = request.session.get("user_id")
+
+    # --- ✅ UPDATED: Use the validated user object ---
+    user_id = current_user.id
     transactions = pocketbase_service.get_user_transactions(user_id)
     context["transactions"] = transactions
-    
+
     return templates.TemplateResponse("dashboard.html", context)
 
 
 @router.get("/pricing", response_class=HTMLResponse, tags=["Web Frontend"])
-async def pricing_page(
-    request: Request,
-    context: dict = Depends(Tmpl)
-):
+async def pricing_page(request: Request, context: dict = Depends(Tmpl)):
     """Fetches products from Stripe and displays the pricing page."""
     payment_status = request.query_params.get("payment")
     if payment_status == "cancelled":
         flash(request, "Your purchase was cancelled.", "info")
-    
+
     subscription_plans, one_time_packs = stripe_service.get_all_active_products_and_prices()
     context["subscription_plans"] = subscription_plans
     context["one_time_packs"] = one_time_packs
-    
+
     return templates.TemplateResponse("main/pricing.html", context)
 
 
@@ -101,12 +98,13 @@ async def policy_page(request: Request, context: dict = Depends(Tmpl)):
 
 
 @router.get("/customer-portal", tags=["Web Frontend"])
-async def customer_portal(
-    request: Request,
-    user_token: str = Depends(get_current_user_from_session)
-):
+async def customer_portal(request: Request, context: dict = Depends(Tmpl)):
     """Redirects the user to the Stripe Customer Portal."""
-    user_record = pocketbase_service.get_user_from_token(user_token)
+
+    user_record = context.get("current_user")
+    if not user_record:
+        flash(request, "You must be logged in to manage your billing.", "warning")
+        return RedirectResponse(url="/login", status_code=303)
 
     if not user_record or not user_record.stripe_customer_id:
         flash(request, "No billing information found to manage.", "error")
@@ -128,23 +126,28 @@ async def create_checkout_session(
     request: Request,
     price_id: str = Form(...),
     mode: str = Form(...),
-    user_token: str = Depends(get_current_user_from_session) 
+    context: dict = Depends(Tmpl)
 ):
     """Creates a Stripe Checkout session and redirects the user to it."""
-    user_id = request.session.get("user_id")
-    if not user_id:
+
+    user = context.get("current_user")
+    if not user:
         flash(request, "You must be logged in to make a purchase.", "error")
         return RedirectResponse(url="/login", status_code=303)
+    user_id = user.id
 
-    # Check if user already has an active subscription when trying to subscribe
     if mode == "subscription":
-        user = pocketbase_service.get_user_by_id(user_id)
         if user and hasattr(user, 'subscription_status') and user.subscription_status == 'active':
             flash(request, "You already have an active subscription. Please manage it from your dashboard.", "warning")
             return RedirectResponse(url="/dashboard", status_code=303)
 
+    if mode == "payment":
+        if not getattr(user, "subscription_status", None) or getattr(user, "subscription_status", None) != "active":
+            flash(request, "One-time purchases are disabled unless you have an active subscription.", "warning")
+            return RedirectResponse(url="/pricing", status_code=303)
+
     session = stripe_service.create_checkout_session(price_id, user_id, request, mode)
-    
+
     if session and session.url:
         return RedirectResponse(url=session.url, status_code=303)
     else:
@@ -152,64 +155,3 @@ async def create_checkout_session(
         return RedirectResponse(url="/pricing", status_code=303)
 
 
-@router.post("/cancel-subscription", tags=["Web Frontend"])
-async def cancel_subscription(
-    request: Request,
-    user_token: str = Depends(get_current_user_from_session)
-):
-    """Cancels the user's active subscription."""
-    user_id = request.session.get("user_id")
-    if not user_id:
-        flash(request, "You must be logged in to cancel a subscription.", "error")
-        return RedirectResponse(url="/login", status_code=303)
-
-    user = pocketbase_service.get_user_by_id(user_id)
-
-    # Check if user has an active subscription
-    if not user or user.subscription_status != 'active' or not user.stripe_subscription_id:
-        flash(request, "You don't have an active subscription to cancel.", "error")
-        return RedirectResponse(url="/dashboard", status_code=303)
-
-    # Cancel the subscription via Stripe
-    success = stripe_service.cancel_subscription(user.stripe_subscription_id)
-
-    if success:
-        flash(request, "Your subscription has been cancelled. You'll continue to have access until the end of your billing period.", "success")
-    else:
-        flash(request, "Failed to cancel subscription. Please try again or contact support.", "error")
-
-    return RedirectResponse(url="/dashboard", status_code=303)
-
-
-@router.post("/reactivate-subscription", tags=["Web Frontend"])
-async def reactivate_subscription(
-    request: Request,
-    user_token: str = Depends(get_current_user_from_session)
-):
-    """Reactivates a subscription that was set to cancel."""
-    user_id = request.session.get("user_id")
-    if not user_id:
-        flash(request, "You must be logged in to reactivate a subscription.", "error")
-        return RedirectResponse(url="/login", status_code=303)
-
-    user = pocketbase_service.get_user_by_id(user_id)
-
-    # Check if user has a canceling subscription
-    if not user or user.subscription_status != 'canceling':
-        flash(request, "You don't have a subscription to reactivate.", "error")
-        return RedirectResponse(url="/dashboard", status_code=303)
-
-    # Check if the subscription still exists in Stripe (not expired yet)
-    if not user.stripe_subscription_id:
-        flash(request, "Your subscription has already ended and cannot be reactivated. Please subscribe again from the pricing page.", "warning")
-        return RedirectResponse(url="/pricing", status_code=303)
-
-    # Reactivate the subscription via Stripe
-    success = stripe_service.reactivate_subscription(user.stripe_subscription_id)
-
-    if success:
-        flash(request, "Your subscription has been reactivated! It will continue to renew automatically.", "success")
-    else:
-        flash(request, "Failed to reactivate subscription. Please try again or contact support.", "error")
-
-    return RedirectResponse(url="/dashboard", status_code=303)

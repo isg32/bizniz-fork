@@ -123,6 +123,10 @@ async def burn_user_coins(
     1. A valid User Bearer token.
     2. A valid Internal API Key in the `X-Internal-API-Key` header.
     """
+    # Ensure the user has an active subscription before allowing coin burns via the API
+    if not getattr(current_user, 'subscription_status', None) or current_user.subscription_status != 'active':
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="You don't have any active subscription plan")
+
     success, message = pocketbase_service.burn_coins(
         user_id=current_user.id, amount=burn_data.amount, description=burn_data.description
     )
@@ -166,7 +170,7 @@ async def send_user_email(
     2. A valid Internal API Key in the `X-Internal-API-Key` header.
     """
     success = email_service.send_notification_email(
-        to_email=current_user.email,
+        to_email=str(current_user.email),
         subject=email_data.subject,
         message_html=email_data.message_html
     )

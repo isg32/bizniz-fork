@@ -1,81 +1,184 @@
-{% extends "layouts/base.html" %}
-{% block title %}Your Dashboard{% endblock %}
-
+{% extends "layouts/base.html" %} {% block title %}Your Dashboard{% endblock %}
 {% block content %}
-<div class="bg-slate-50">
+<div style="background-color: var(--bg-color)">
     <div class="max-w-7xl mx-auto py-12 px-4 sm:px-6 lg:px-8">
-        
         <!-- Header -->
-        <div class="pb-8 border-b border-slate-200">
-            <h1 class="text-3xl font-bold tracking-tight text-slate-900">Dashboard</h1>
-            <p class="mt-1 text-lg text-slate-600">Welcome back, {{ current_user.name }}!</p>
+        <div class="pb-8 border-b theme-border">
+            <h1
+                class="text-3xl font-bold tracking-tight"
+                style="color: var(--text-color)"
+            >
+                Dashboard
+            </h1>
+            <p class="mt-1 text-lg theme-text-secondary">
+                Welcome back, {{ current_user.name }}!
+            </p>
         </div>
 
-        <div class="mt-8">
-             {% include 'partials/flash.html' %}
-        </div>
-       
+        <div class="mt-8">{% include 'partials/flash.html' %}</div>
+
         <div class="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-10">
             <!-- Left Column -->
             <div class="lg:col-span-2 space-y-10">
-
                 <!-- Account Overview -->
                 <div>
-                    <h2 class="text-lg font-medium text-slate-900 mb-4">Account Overview</h2>
+                    <h2
+                        class="text-lg font-medium mb-4"
+                        style="color: var(--text-color)"
+                    >
+                        Account Overview
+                    </h2>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <!-- Balance Card -->
-                        <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex flex-col">
+                        <div
+                            class="p-6 rounded-lg theme-shadow theme-border flex flex-col"
+                            style="background: var(--bg-hero-color)"
+                        >
                             <div class="flex items-start justify-between">
                                 <div>
-                                    <p class="text-sm font-medium text-slate-500">{{ settings.CREDIT_UNIT_NAME_PLURAL }} Balance</p>
-                                    <p class="text-3xl font-bold text-indigo-600 mt-1">{{ "%.0f"|format(current_user.coins|float) }}</p>
+                                    <p
+                                        class="text-sm font-medium theme-text-secondary"
+                                    >
+                                        {{ settings.CREDIT_UNIT_NAME_PLURAL }}
+                                        Balance
+                                    </p>
+                                    <p
+                                        class="text-3xl font-bold mt-1"
+                                        style="color: var(--accent-color)"
+                                    >
+                                        {{
+                                        "%.0f"|format(current_user.coins|float)
+                                        }}
+                                    </p>
+                                    {% if not current_user or
+                                    current_user.subscription_status != 'active'
+                                    %}
+                                    <p class="mt-2 text-sm text-amber-700">
+                                        Note: Your credits will only be
+                                        accessible when your subscription is
+                                        active.
+                                    </p>
+                                    {% endif %}
                                 </div>
                                 <div class="p-2 bg-amber-100 rounded-md">
-                                    <i class="fa-solid fa-coins fa-lg text-amber-500"></i>
+                                    <i
+                                        class="fa-solid fa-coins fa-lg text-amber-500"
+                                    ></i>
                                 </div>
                             </div>
                             <div class="mt-auto pt-4">
-                                <a href="/pricing" class="w-full text-center rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">Get More</a>
+                                <a
+                                    href="/pricing"
+                                    class="w-full text-center rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500"
+                                    >Get More</a
+                                >
                             </div>
                         </div>
                         <!-- Subscription Card -->
-                         <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200 flex flex-col">
+                        <div
+                            class="p-6 rounded-lg theme-shadow theme-border flex flex-col"
+                            style="background: var(--bg-hero-color)"
+                        >
                             <div class="flex items-start justify-between">
                                 <div>
-                                    <p class="text-sm font-medium text-slate-500">Subscription Plan</p>
-                                    <p class="text-3xl font-bold text-slate-800 mt-1">{{ current_user.active_plan_name or 'None' }}</p>
+                                    <p
+                                        class="text-sm font-medium theme-text-secondary"
+                                    >
+                                        Subscription Plan
+                                    </p>
+                                    <p
+                                        class="text-3xl font-bold mt-1"
+                                        style="color: var(--text-color)"
+                                    >
+                                        {{ current_user.active_plan_name or
+                                        'None' }}
+                                    </p>
                                 </div>
-                                 <div class="p-2 bg-slate-100 rounded-md">
-                                    <i class="fa-solid fa-credit-card fa-lg text-slate-500"></i>
+                                <div class="p-2 bg-slate-100 rounded-md">
+                                    <i
+                                        class="fa-solid fa-credit-card fa-lg text-slate-500"
+                                    ></i>
                                 </div>
                             </div>
-                            <p class="mt-2 text-sm text-slate-500">Status: <span class="font-semibold text-slate-700">{{ current_user.subscription_status|capitalize }}</span></p>
+                            <p class="mt-2 text-sm theme-text-secondary">
+                                Status:
+                                <span
+                                    class="font-semibold"
+                                    style="color: var(--text-color)"
+                                    >{{
+                                    current_user.subscription_status|capitalize
+                                    }}</span
+                                >
+                            </p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Transaction History -->
                 <div>
-                    <h2 class="text-lg font-medium text-slate-900 mb-4">Transaction History</h2>
+                    <h2
+                        class="text-lg font-medium mb-4"
+                        style="color: var(--text-color)"
+                    >
+                        Transaction History
+                    </h2>
                     <!-- MODIFICATION START: Added a container div for scrolling -->
-                    <div class="bg-white rounded-lg shadow-sm border border-slate-200 max-h-[32rem] overflow-y-auto">
-                    <!-- MODIFICATION END -->
+                    <div
+                        class="rounded-lg theme-shadow theme-border max-h-[32rem] overflow-y-auto"
+                    >
+                        <!-- MODIFICATION END -->
                         <div class="overflow-x-auto">
                             {% if transactions %}
-                            <table class="min-w-full divide-y divide-slate-200">
-                                <thead class="bg-slate-50 sticky top-0"> <!-- Make header sticky -->
+                            <table class="min-w-full divide-y theme-border">
+                                <thead
+                                    class="sticky top-0"
+                                    style="
+                                        background-color: var(--bg-hero-color);
+                                    "
+                                >
+                                    <!-- Make header sticky -->
                                     <tr>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Date</th>
-                                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Description</th>
-                                        <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-slate-500 uppercase tracking-wider">Amount</th>
+                                        <th
+                                            scope="col"
+                                            class="px-6 py-3 text-left text-xs font-medium theme-text-secondary uppercase tracking-wider"
+                                        >
+                                            Date
+                                        </th>
+                                        <th
+                                            scope="col"
+                                            class="px-6 py-3 text-left text-xs font-medium theme-text-secondary uppercase tracking-wider"
+                                        >
+                                            Description
+                                        </th>
+                                        <th
+                                            scope="col"
+                                            class="px-6 py-3 text-right text-xs font-medium theme-text-secondary uppercase tracking-wider"
+                                        >
+                                            Amount
+                                        </th>
                                     </tr>
                                 </thead>
-                                <tbody class="bg-white divide-y divide-slate-200">
+                                <tbody
+                                    class="divide-y theme-border"
+                                    style="background-color: var(--bg-surface)"
+                                >
                                     {% for tx in transactions %}
                                     <tr>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{{ tx.created.strftime('%b %d, %Y') }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{{ tx.description }}</td>
-                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono {% if tx.amount > 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                        <td
+                                            class="px-6 py-4 whitespace-nowrap text-sm theme-text-secondary"
+                                        >
+                                            {{ tx.created.strftime('%b %d, %Y')
+                                            }}
+                                        </td>
+                                        <td
+                                            class="px-6 py-4 whitespace-nowrap text-sm"
+                                            style="color: var(--text-color)"
+                                        >
+                                            {{ tx.description }}
+                                        </td>
+                                        <td
+                                            class="px-6 py-4 whitespace-nowrap text-right text-sm font-mono {% if tx.amount > 0 %}text-green-600{% else %}text-red-600{% endif %}"
+                                        >
                                             {{ "{:+.0f}".format(tx.amount) }}
                                         </td>
                                     </tr>
@@ -83,7 +186,9 @@
                                 </tbody>
                             </table>
                             {% else %}
-                            <p class="p-6 text-sm text-slate-500">You have no transactions yet.</p>
+                            <p class="p-6 text-sm theme-text-secondary">
+                                You have no transactions yet.
+                            </p>
                             {% endif %}
                         </div>
                     </div>
@@ -92,30 +197,22 @@
 
             <!-- Right Column -->
             <div class="lg:col-span-1 space-y-8">
-                {% if current_user.subscription_status == 'active' %}
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <h3 class="font-medium text-slate-900">Manage Subscription</h3>
-                    <p class="text-sm text-slate-500 mt-2">Cancel your plan at any time. You'll keep access until the end of your billing period.</p>
-                    <button onclick="document.getElementById('cancel_subscription_modal').showModal()" class="mt-4 w-full text-center rounded-md bg-red-50 px-3.5 py-2.5 text-sm font-semibold text-red-600 shadow-sm hover:bg-red-100">
-                        Cancel Subscription
-                    </button>
-                </div>
-                {% elif current_user.subscription_status == 'canceling' %}
-                <div class="bg-white p-6 rounded-lg shadow-sm border-2 border-amber-300">
-                    <h3 class="font-medium text-amber-800">Subscription Canceling</h3>
-                    <p class="text-sm text-amber-700 mt-2">Your plan will cancel at the end of your billing period. Changed your mind?</p>
-                    <form action="/reactivate-subscription" method="POST" class="mt-4">
-                        <button type="submit" class="w-full text-center rounded-md bg-indigo-600 px-3.5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500">
-                            Reactivate Subscription
-                        </button>
-                    </form>
-                </div>
-                {% endif %}
-                 <!-- Manage Billing -->
-                <div class="bg-white p-6 rounded-lg shadow-sm border border-slate-200">
-                    <h3 class="font-medium text-slate-900">Manage Billing</h3>
-                    <p class="text-sm text-slate-500 mt-2">Update your payment methods and view past invoices.</p>
-                    <a href="/customer-portal" class="mt-4 block w-full text-center rounded-md bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50">
+                <!-- Manage Billing -->
+                <div
+                    class="p-6 rounded-lg theme-shadow theme-border"
+                    style="background: var(--bg-hero-color)"
+                >
+                    <h3 class="font-medium" style="color: var(--text-color)">
+                        Manage Billing
+                    </h3>
+                    <p class="text-sm theme-text-secondary mt-2">
+                        Update your payment methods and view past invoices.
+                    </p>
+                    <a
+                        href="/customer-portal"
+                        class="mt-4 block w-full text-center rounded-md px-3.5 py-2.5 text-sm font-semibold theme-text-secondary theme-shadow ring-1 ring-inset theme-border hover:bg-slate-50"
+                        style="background: var(--bg-color)"
+                    >
                         Open Billing Portal
                     </a>
                 </div>
@@ -123,20 +220,4 @@
         </div>
     </div>
 </div>
-
-<!-- Cancel Subscription Confirmation Modal -->
-<dialog id="cancel_subscription_modal" class="p-0 rounded-lg shadow-xl max-w-sm">
-    <div class="p-6">
-        <h3 class="font-bold text-lg text-slate-900">Cancel Subscription?</h3>
-        <p class="py-4 text-slate-600">Are you sure? You will keep access until the end of your current billing period.</p>
-        <div class="flex justify-end gap-4 mt-4">
-            <form method="dialog">
-                <button class="rounded-md bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-800 hover:bg-slate-200">Keep Plan</button>
-            </form>
-            <form action="/cancel-subscription" method="POST">
-                <button type="submit" class="rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700">Yes, Cancel</button>
-            </form>
-        </div>
-    </div>
-</dialog>
 {% endblock %}

@@ -1,45 +1,68 @@
-{% extends "layouts/base.html" %}
-{% block title %}Policies - {{ settings.PROJECT_NAME }}{% endblock %}
-
-{% block content %}
-<div class="bg-white px-6 py-24 sm:py-32 lg:px-8">
+{% extends "layouts/base.html" %} {% block title %}Policies - {{
+settings.PROJECT_NAME }}{% endblock %} {% block content %}
+<div class="px-6 py-24 sm:py-32 lg:px-8" style="background: var(--bg-color)">
     <div class="mx-auto max-w-3xl text-base leading-7 text-slate-700">
-        <h1 class="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">Policies</h1>
-        
+        <h1
+            class="text-3xl font-bold tracking-tight sm:text-4xl"
+            style="color: var(--text-color)"
+        >
+            Policies
+        </h1>
+
         <!-- The `prose` class adds beautiful typography defaults -->
-        <div class="mt-10 prose prose-slate max-w-none prose-a:text-indigo-600 hover:prose-a:text-indigo-700">
-            
-            <h2>Terms and Conditions</h2>
+        <div
+            class="mt-10 prose prose-slate max-w-none hover:prose-a:text-indigo-700"
+            style="color: var(--text-color)"
+        >
+            <h2 style="color: var(--text-color)">Terms and Conditions</h2>
             <p>
-                By using {{ settings.PROJECT_NAME }}, you agree to use the service for lawful purposes only and in accordance with our usage policies.
-                Any misuse, automation abuse, or attempt to reverse-engineer the service may lead to account suspension or termination.
-                We reserve the right to modify these terms at any time without prior notice.
+                By using {{ settings.PROJECT_NAME }}, you agree to use the
+                service for lawful purposes only and in accordance with our
+                usage policies. Any misuse, automation abuse, or attempt to
+                reverse-engineer the service may lead to account suspension or
+                termination. We reserve the right to modify these terms at any
+                time without prior notice.
             </p>
 
-            <h2>Cancellation & Refund Policy</h2>
+            <h2 style="color: var(--text-color)">
+                Cancellation & Refund Policy
+            </h2>
             <p>
-                Since our service is based on a digital coin system, all purchases of {{ settings.CREDIT_UNIT_NAME_PLURAL }} are final and non-refundable.
-                If you experience a technical failure preventing you from using the service or an accidental duplicate payment, please contact us within 7 days of purchase.
-                Refunds are reviewed on a case-by-case basis.
+                Since our service is based on a digital coin system, all
+                purchases of {{ settings.CREDIT_UNIT_NAME_PLURAL }} are final
+                and non-refundable. If you experience a technical failure
+                preventing you from using the service or an accidental duplicate
+                payment, please contact us within 7 days of purchase. Refunds
+                are reviewed on a case-by-case basis.
             </p>
-            
-            <h2>Privacy & Data Handling</h2>
+
+            <h2 style="color: var(--text-color)">Privacy & Data Handling</h2>
             <p>
-                We collect minimal user information required for account creation and payment processing. We do not store your credit card information; all transactions are processed securely via Stripe. 
-                <strong>Any content (text, audio, images) you submit to our AI services is processed on secure third-party servers (e.g., Google) and is not stored by us long-term.</strong> We respect your content's privacy.
+                We collect minimal user information required for account
+                creation and payment processing. We do not store your credit
+                card information; all transactions are processed securely via
+                Stripe.
+                ><b
+                    >Any content (text, audio, images) you submit to our AI
+                    services is processed on secure third-party servers (e.g.,
+                    Google) and is not stored by us long-term.</b
+                We respect your content's privacy.
             </p>
 
-            <h2>Contact & Complaints</h2>
+            <h2 style="color: var(--text-color)">Contact & Complaints</h2>
             <p>
-                For questions, feedback, or complaints related to privacy, billing, or service, please reach out to our support team.
+                For questions, feedback, or complaints related to privacy,
+                billing, or service, please reach out to our support team.
             </p>
 
-            <hr>
+            <hr />
 
-            <p class="text-sm text-slate-500">
-                By using {{ settings.PROJECT_NAME }}, you agree to all the above policies and terms.
+            <p class="text-sm"
+                style="color: var(--text-secondary);"
+            >
+                By using {{ settings.PROJECT_NAME }}, you agree to all the above
+                policies and terms.
             </p>
-
         </div>
     </div>
 </div>
