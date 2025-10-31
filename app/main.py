@@ -5,7 +5,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
-import ssl # ✅ IMPORT the ssl module
+# - REMOVE: We will no longer use the ssl module for this workaround.
+# import ssl 
 
 # --- Application Imports ---
 from app.core.config import settings
@@ -25,18 +26,10 @@ async def lifespan(app: FastAPI):
     # --- Code to run on startup ---
     print("Initializing services...")
 
-    # --- ✅ THE SSL FIX ---
-    # Globally disable SSL certificate verification for the entire app process.
-    # This is required to connect to the custom domain `pb.bugswriter.ai`.
-    print("Applying global SSL unverified context for PocketBase connection...")
-    try:
-        _create_unverified_https_context = ssl._create_unverified_context
-    except AttributeError:
-        pass # For legacy Python versions
-    else:
-        ssl._create_default_https_context = _create_unverified_https_context
-    # --- END OF FIX ---
-
+    # --- ❌ REMOVED: The entire SSL unverified context block is gone. ---
+    # This was a major security risk and has been removed.
+    # Ensure your PocketBase server has a valid SSL/TLS certificate.
+    
     # Initialize your internal services
     pocketbase_service.init_clients()
     print("PocketBase clients initialized.")

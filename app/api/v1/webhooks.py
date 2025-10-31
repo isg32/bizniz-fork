@@ -3,6 +3,7 @@
 import stripe
 import logging
 from fastapi import APIRouter, Request, Header, HTTPException
+from pocketbase.utils import ClientResponseError
 from app.core.config import settings
 from app.services.internal import pocketbase_service, email_service
 
@@ -10,6 +11,8 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # --- Webhook Event Handlers ---
+# (No changes are needed in the individual handler functions like handle_checkout_completed, etc.)
+# ... existing handler functions remain the same ...
 
 def _get_product_details_from_line_item(line_item) -> tuple:
     """Helper to extract product name and coins from a line item object."""
@@ -151,7 +154,6 @@ def handle_subscription_updated(subscription: dict):
     if update_data:
         pocketbase_service.update_user(user.id, update_data)
 
-# Other handlers (deleted, customer.created) can be similarly enhanced but are omitted for brevity.
 def handle_subscription_deleted(subscription: dict):
     stripe_subscription_id = subscription.get('id')
     logger.info(f"WEBHOOK: Processing customer.subscription.deleted for sub '{stripe_subscription_id}'.")
@@ -162,14 +164,15 @@ def handle_customer_created(customer: dict):
     logger.info(f"WEBHOOK: Processing customer.created for customer '{customer_id}'.")
     # Logic remains the same...
 
+
 # --- Main Webhook Route ---
 
 EVENT_HANDLERS = {
     'checkout.session.completed': handle_checkout_completed,
     'invoice.payment_succeeded': handle_invoice_succeeded,
-    'customer.subscription.deleted': handle_subscription_deleted, # This needs to exist
+    'customer.subscription.deleted': handle_subscription_deleted,
     'customer.subscription.updated': handle_subscription_updated,
-    'customer.created': handle_customer_created, # This needs to exist
+    'customer.created': handle_customer_created,
 }
 
 @router.post("/stripe-webhook", include_in_schema=False)
@@ -182,16 +185,37 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
         logger.error(f"STRIPE-WEBHOOK: Webhook signature verification failed. Error: {e}")
         raise HTTPException(status_code=400, detail=f"Webhook error: {e}")
 
-    handler = EVENT_HANDLERS.get(event['type'])
+    event_id = event['id']
+    event_type = event['type']
+    
+    # --- ✅ IDEMPOTENCY CHECK ---
+    try:
+        pocketbase_service.admin_pb.collection("processed_stripe_events").get_first_list_item(f'event_id="{event_id}"')
+        logger.warning(f"STRIPE-WEBHOOK: Duplicate event '{event_type}' (ID: {event_id}) received. Ignoring.")
+        return {"status": "duplicate ignored"}
+    except ClientResponseError as e:
+        if e.status != 404: # A 404 is expected and means the event is new
+            logger.error(f"STRIPE-WEBHOOK: Database error checking for event ID '{event_id}'. Error: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Could not verify event idempotency.")
+    # --- END OF IDEMPOTENCY CHECK ---
+
+    handler = EVENT_HANDLERS.get(event_type)
     
     if handler:
-        logger.info(f"STRIPE-WEBHOOK: Received event: '{event['type']}' (ID: {event['id']}). Routing to handler.")
+        logger.info(f"STRIPE-WEBHOOK: Received event: '{event_type}' (ID: {event_id}). Routing to handler.")
         try:
             handler(event['data']['object'])
+            
+            # --- ✅ RECORD EVENT ID ---
+            try:
+                pocketbase_service.admin_pb.collection("processed_stripe_events").create({"event_id": event_id})
+            except Exception as e_create:
+                 logger.critical(f"STRIPE-WEBHOOK: CRITICAL - Processed event '{event_id}' but FAILED to record it. Manual check required! Error: {e_create}", exc_info=True)
+            # --- END OF RECORDING ---
+
         except Exception as e:
-            logger.critical(f"STRIPE-WEBHOOK: Unhandled exception in handler for '{event['type']}'. Error: {e}", exc_info=True)
-            # Still return 200 to Stripe to prevent retries for code errors
+            logger.critical(f"STRIPE-WEBHOOK: Unhandled exception in handler for '{event_type}'. Error: {e}", exc_info=True)
     else:
-        logger.info(f"STRIPE-WEBHOOK: Ignoring unhandled event type '{event['type']}'.")
+        logger.info(f"STRIPE-WEBHOOK: Ignoring unhandled event type '{event_type}'.")
         
     return {"status": "received"}
