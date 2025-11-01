@@ -108,31 +108,43 @@ async def policy_page(request: Request, context: dict = Depends(Tmpl)):
     return templates.TemplateResponse("main/policy.html", context)
 
 
+# In routes.py, update the tools function:
 @router.get("/agents", response_class=HTMLResponse, tags=["Web Frontend"])
-async def tools(request: Request, context: dict = Depends(Tmpl)):
-    """Serves the Tool Hub page and fetches available servers."""
-    url = "https://mcp.bugswriter.ai/mcp/servers"
-    available_servers = []
+async def agents(request: Request, context: dict = Depends(Tmpl)):
+    """Serves the Hub page of available agents."""
+    # Assuming the API endpoint URL has changed to return the new JSON structure
+    url = "https://sys.bugswriter.ai/api/v1/admin/agents/"  # Fictional URL for the new data structure
+    available_agents = []
 
     try:
         # Use httpx.AsyncClient for making asynchronous HTTP requests
         async with httpx.AsyncClient(timeout=10) as client:
+            # Note: The original URL was "https://mcp.bugswriter.ai/mcp/servers".
+            # If that URL still returns the *new* JSON format (the list of agents), keep the old URL.
+            # If you are fetching this new structure from a different URL, update it here.
             response = await client.get(url)
+            print(response)
             response.raise_for_status()  # Raises an exception for 4xx/5xx responses
+
+            # The new JSON is a list, not an object with a key like 'available_servers'
             data = response.json()
-            available_servers = data.get("available_servers", [])
+            if isinstance(data, list):
+                available_agents = data
+
     except httpx.HTTPStatusError as e:
         flash(
             request,
-            f"Could not load tools: HTTP error {e.response.status_code}",
+            f"Could not load agents: HTTP error {e.response.status_code}",
             "error",
         )
     except httpx.RequestError:
-        flash(request, "Could not connect to the MCP Agent server.", "error")
+        flash(request, "Could not connect to the tool server.", "error")
     except Exception:
-        flash(request, "An unexpected error occurred while fetching Agents.", "error")
+        flash(request, "An unexpected error occurred while fetching agents.", "error")
 
-    context["available_servers"] = available_servers
+    context["available_servers"] = (
+        available_agents  # Keep the variable name for now to minimize template changes
+    )
     return templates.TemplateResponse("agents.html", context)
 
 
