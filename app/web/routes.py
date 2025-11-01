@@ -2,12 +2,14 @@ from fastapi import APIRouter, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+import httpx
 from app.core.config import settings
 from app.services.internal import stripe_service, pocketbase_service
 
 # Initialize the template engine
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()
+
 
 def flash(request: Request, message: str, category: str = "info"):
     """Helper function to add a flash message to the session."""
@@ -17,6 +19,7 @@ def flash(request: Request, message: str, category: str = "info"):
 
 
 # --- Dependencies ---
+
 
 async def Tmpl(request: Request):
     """
@@ -43,10 +46,12 @@ async def Tmpl(request: Request):
         "request": request,
         "settings": settings,
         "current_user": current_user,
-        "flash_messages": request.session.pop("flash_messages", [])
+        "flash_messages": request.session.pop("flash_messages", []),
     }
 
+
 # --- Web Page Routes ---
+
 
 @router.get("/", response_class=HTMLResponse, tags=["Web Frontend"])
 async def index(request: Request, context: dict = Depends(Tmpl)):
@@ -67,7 +72,11 @@ async def dashboard(request: Request, context: dict = Depends(Tmpl)):
 
     payment_status = request.query_params.get("payment")
     if payment_status == "success":
-        flash(request, "Your purchase was successful! Your account has been updated.", "success")
+        flash(
+            request,
+            "Your purchase was successful! Your account has been updated.",
+            "success",
+        )
 
     # --- ✅ UPDATED: Use the validated user object ---
     user_id = current_user.id
@@ -84,7 +93,9 @@ async def pricing_page(request: Request, context: dict = Depends(Tmpl)):
     if payment_status == "cancelled":
         flash(request, "Your purchase was cancelled.", "info")
 
-    subscription_plans, one_time_packs = stripe_service.get_all_active_products_and_prices()
+    subscription_plans, one_time_packs = (
+        stripe_service.get_all_active_products_and_prices()
+    )
     context["subscription_plans"] = subscription_plans
     context["one_time_packs"] = one_time_packs
 
@@ -95,6 +106,34 @@ async def pricing_page(request: Request, context: dict = Depends(Tmpl)):
 async def policy_page(request: Request, context: dict = Depends(Tmpl)):
     """Serves the privacy policy page."""
     return templates.TemplateResponse("main/policy.html", context)
+
+
+@router.get("/agents", response_class=HTMLResponse, tags=["Web Frontend"])
+async def tools(request: Request, context: dict = Depends(Tmpl)):
+    """Serves the Tool Hub page and fetches available servers."""
+    url = "https://mcp.bugswriter.ai/mcp/servers"
+    available_servers = []
+
+    try:
+        # Use httpx.AsyncClient for making asynchronous HTTP requests
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(url)
+            response.raise_for_status()  # Raises an exception for 4xx/5xx responses
+            data = response.json()
+            available_servers = data.get("available_servers", [])
+    except httpx.HTTPStatusError as e:
+        flash(
+            request,
+            f"Could not load tools: HTTP error {e.response.status_code}",
+            "error",
+        )
+    except httpx.RequestError:
+        flash(request, "Could not connect to the MCP Agent server.", "error")
+    except Exception:
+        flash(request, "An unexpected error occurred while fetching Agents.", "error")
+
+    context["available_servers"] = available_servers
+    return templates.TemplateResponse("agents.html", context)
 
 
 @router.get("/customer-portal", tags=["Web Frontend"])
@@ -110,23 +149,30 @@ async def customer_portal(request: Request, context: dict = Depends(Tmpl)):
         flash(request, "No billing information found to manage.", "error")
         return RedirectResponse(url="/dashboard", status_code=303)
 
-    portal_session = stripe_service.create_customer_portal_session(user_record.stripe_customer_id, request)
+    portal_session = stripe_service.create_customer_portal_session(
+        user_record.stripe_customer_id, request
+    )
 
     if portal_session and portal_session.url:
         return RedirectResponse(url=portal_session.url, status_code=303)
     else:
-        flash(request, "Could not open the customer portal. Please contact support.", "error")
+        flash(
+            request,
+            "Could not open the customer portal. Please contact support.",
+            "error",
+        )
         return RedirectResponse(url="/dashboard", status_code=303)
 
 
 # --- Form Handling Routes ---
+
 
 @router.post("/create-checkout-session", tags=["Web Frontend"])
 async def create_checkout_session(
     request: Request,
     price_id: str = Form(...),
     mode: str = Form(...),
-    context: dict = Depends(Tmpl)
+    context: dict = Depends(Tmpl),
 ):
     """Creates a Stripe Checkout session and redirects the user to it."""
 
@@ -137,13 +183,28 @@ async def create_checkout_session(
     user_id = user.id
 
     if mode == "subscription":
-        if user and hasattr(user, 'subscription_status') and user.subscription_status == 'active':
-            flash(request, "You already have an active subscription. Please manage it from your dashboard.", "warning")
+        if (
+            user
+            and hasattr(user, "subscription_status")
+            and user.subscription_status == "active"
+        ):
+            flash(
+                request,
+                "You already have an active subscription. Please manage it from your dashboard.",
+                "warning",
+            )
             return RedirectResponse(url="/dashboard", status_code=303)
 
     if mode == "payment":
-        if not getattr(user, "subscription_status", None) or getattr(user, "subscription_status", None) != "active":
-            flash(request, "One-time purchases are disabled unless you have an active subscription.", "warning")
+        if (
+            not getattr(user, "subscription_status", None)
+            or getattr(user, "subscription_status", None) != "active"
+        ):
+            flash(
+                request,
+                "One-time purchases are disabled unless you have an active subscription.",
+                "warning",
+            )
             return RedirectResponse(url="/pricing", status_code=303)
 
     session = stripe_service.create_checkout_session(price_id, user_id, request, mode)
@@ -153,5 +214,3 @@ async def create_checkout_session(
     else:
         flash(request, "Could not create a payment session. Please try again.", "error")
         return RedirectResponse(url="/pricing", status_code=303)
-
-

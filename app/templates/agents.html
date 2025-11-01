@@ -1,0 +1,84 @@
+<!-- app/templates/agents.html -->
+{% extends "layouts/base.html" %} {% block title %}Available Tools{% endblock %}
+{% block content %}
+<div class="py-16 sm:py-24" style="background-color: var(--bg-color)">
+    <div class="mx-auto max-w-7xl px-6 lg:px-8">
+        <!-- Header -->
+        <div class="mx-auto max-w-4xl text-center pb-8 border-b theme-border">
+            <h1
+                class="text-3xl font-bold tracking-tight sm:text-4xl"
+                style="color: var(--text-color)"
+            >
+                Our Agents List
+            </h1>
+            <p class="mt-2 text-lg leading-8 theme-text-secondary">
+                Explore all available Non / AI MCP Servers and microservices in
+                the Hub.
+            </p>
+        </div>
+
+        <!-- Server List (List Tiles) -->
+        <div
+            class="mt-12 mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+        >
+            {% if available_servers %} {% for server in available_servers %}
+            <!-- List Tile / Card for each server -->
+            <div
+                class="p-6 rounded-lg theme-shadow theme-border theme-surface hover:ring-2 hover:ring-indigo-600 transition duration-200 fade-in"
+                style="background: var(--bg-hero-color)"
+            >
+                <div class="flex items-start space-x-4">
+                    <!-- Avatar Placeholder (Leading) -->
+                    <div
+                        class="w-10 h-10 flex-shrink-0 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg"
+                    >
+                        <!-- Display first letter of the server name -->
+                        {{ server.name[0]|upper }}
+                    </div>
+
+                    <!-- Content Area -->
+                    <div class="flex-grow">
+                        <div class="flex items-start justify-between">
+                            <h2
+                                class="text-xl font-semibold leading-snug"
+                                style="color: var(--text-color)"
+                            >
+                                {{ server.name }}
+                            </h2>
+                        </div>
+
+                        <p class="mt-1 text-sm font-mono theme-text-secondary">
+                            {{ server.mount_prefix }}
+                        </p>
+
+                        <p
+                            class="mt-4 text-sm theme-text-secondary line-clamp-4"
+                        >
+                            {{ server.instructions }}
+                        </p>
+
+                        <!-- Conceptual link to the agent page using mount_prefix -->
+                        <a
+                            href="/tools/{{ server.mount_prefix }}"
+                            class="mt-4 inline-flex items-center gap-1 text-sm font-medium hover:text-indigo-500"
+                            style="color: var(--accent-color)"
+                        >
+                            Go to Tool
+                            <i class="fa-solid fa-arrow-right text-xs"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %} {% else %}
+            <div
+                class="col-span-full text-center p-10 theme-surface theme-border rounded-lg"
+            >
+                <p class="theme-text-secondary">
+                    No AI servers are currently available.
+                </p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
