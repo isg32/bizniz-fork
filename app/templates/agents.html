@@ -17,62 +17,112 @@
             </p>
         </div>
 
-        <!-- Server List (List Tiles) -->
-        <div
-            class="mt-12 mx-auto max-w-7xl grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
-        >
-            {% if available_servers %} {% for server in available_servers %}
-            <!-- List Tile / Card for each server -->
+        <!-- Server List (Table) -->
+        <div class="mt-12 mx-auto max-w-7xl">
+            {% if available_servers %}
             <div
-                class="p-6 rounded-lg theme-shadow theme-border theme-surface hover:ring-2 hover:ring-indigo-600 transition duration-200 fade-in"
+                class="overflow-x-auto rounded-xl theme-shadow theme-border"
                 style="background: var(--bg-hero-color)"
             >
-                <div class="flex items-start space-x-4">
-                    <!-- Avatar Placeholder (Leading) -->
-                    <div
-                        class="w-10 h-10 flex-shrink-0 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-lg"
+                <table class="min-w-full divide-y theme-border">
+                    <thead
+                        class="sticky top-0"
+                        style="background-color: var(--bg-hero-color)"
                     >
-                        <!-- Display first letter of the server name -->
-                        {{ server.name[0]|upper }}
-                    </div>
-
-                    <!-- Content Area -->
-                    <div class="flex-grow">
-                        <div class="flex items-start justify-between">
-                            <h2
-                                class="text-xl font-semibold leading-snug"
-                                style="color: var(--text-color)"
+                        <tr>
+                            <th
+                                scope="col"
+                                class="px-6 py-4 text-left text-xs font-semibold theme-text-secondary uppercase tracking-wider w-1/4 sm:w-1/6"
                             >
-                                {{ server.name }}
-                            </h2>
-                        </div>
-
-                        <p class="mt-1 text-sm font-mono theme-text-secondary">
-                            {{ server.mount_prefix }}
-                        </p>
-
-                        <p
-                            class="mt-4 text-sm theme-text-secondary line-clamp-4"
+                                Agent Name
+                            </th>
+                            <th
+                                scope="col"
+                                class="hidden sm:table-cell px-6 py-4 text-left text-xs font-semibold theme-text-secondary uppercase tracking-wider w-1/6"
+                            >
+                                Prefix
+                            </th>
+                            <th
+                                scope="col"
+                                class="px-6 py-4 text-left text-xs font-semibold theme-text-secondary uppercase tracking-wider"
+                            >
+                                Description
+                            </th>
+                            <th
+                                scope="col"
+                                class="px-6 py-4 text-right text-xs font-semibold theme-text-secondary uppercase tracking-wider w-1/12"
+                            >
+                                Tool Link
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody
+                        class="divide-y divide-gray-500"
+                        style="background-color: var(--bg-surface)"
+                    >
+                        {% for server in available_servers %}
+                        <tr
+                            class="transition duration-150 hover:bg-slate-50/10 cursor-pointer"
+                            onclick="window.location.href='/tools/{{ server.mount_prefix }}';"
                         >
-                            {{ server.instructions }}
-                        </p>
+                            <!-- Agent Name (Avatar + Name) -->
+                            <td
+                                class="px-6 py-4 whitespace-nowrap text-sm font-medium"
+                            >
+                                <div class="flex items-center">
+                                    <div
+                                        class="w-8 h-8 flex-shrink-0 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center font-bold text-sm mr-4"
+                                    >
+                                        {{ server.name[0]|upper }}
+                                    </div>
+                                    <div
+                                        class="text-base font-semibold"
+                                        style="color: var(--text-color)"
+                                    >
+                                        {{ server.name }}
+                                    </div>
+                                </div>
+                            </td>
 
-                        <!-- Conceptual link to the agent page using mount_prefix -->
-                        <a
-                            href="/tools/{{ server.mount_prefix }}"
-                            class="mt-4 inline-flex items-center gap-1 text-sm font-medium hover:text-indigo-500"
-                            style="color: var(--accent-color)"
-                        >
-                            Go to Tool
-                            <i class="fa-solid fa-arrow-right text-xs"></i>
-                        </a>
-                    </div>
-                </div>
+                            <!-- Prefix -->
+                            <td
+                                class="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm theme-text-secondary font-mono"
+                            >
+                                {{ server.mount_prefix }}
+                            </td>
+
+                            <!-- Description -->
+                            <td
+                                class="px-6 py-4 text-sm theme-text-secondary max-w-xs md:max-w-md lg:max-w-xl"
+                            >
+                                <p class="line-clamp-2">
+                                    {{ server.instructions }}
+                                </p>
+                            </td>
+
+                            <!-- Tool Link -->
+                            <td
+                                class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium"
+                            >
+                                <a
+                                    href="/tools/{{ server.mount_prefix }}"
+                                    class="text-indigo-600 hover:text-indigo-500 font-semibold"
+                                    style="color: var(--accent-color)"
+                                    onclick="event.stopPropagation();"
+                                >
+                                    Go
+                                    <i
+                                        class="fa-solid fa-arrow-right text-xs ml-1"
+                                    ></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
             </div>
-            {% endfor %} {% else %}
-            <div
-                class="col-span-full text-center p-10 theme-surface theme-border rounded-lg"
-            >
+            {% else %}
+            <div class="text-center p-10 theme-surface theme-border rounded-lg">
                 <p class="theme-text-secondary">
                     No AI servers are currently available.
                 </p>
