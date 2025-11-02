@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, File, UploadFile
 from pydantic import BaseModel, Field, EmailStr
 from app.schemas.user import User as UserSchema
 from app.schemas.msg import Msg
+# ✅ NEW: Import the corrected TransactionsResponse schema
+from app.schemas.transaction import TransactionsResponse
 from app.core.dependencies import get_current_api_user, get_internal_api_key
 from app.services.internal import pocketbase_service, email_service
 
@@ -42,14 +44,14 @@ class BurnResponse(BaseModel):
     new_coin_balance: float
 
 
-class TransactionsResponse(BaseModel):
-    """Defines the structure for a user's transaction history."""
-
-    id: str
-    type: str
-    amount: float
-    description: str
-    created: str  # ISO 8601 format string
+# 🔴 REMOVED: The old schema definition is no longer needed here.
+# class TransactionsResponse(BaseModel):
+#     """Defines the structure for a user's transaction history."""
+#     id: str
+#     type: str
+#     amount: float
+#     description: str
+#     created: str
 
 
 # --- API Endpoints for the Authenticated User ---
@@ -143,6 +145,7 @@ async def upload_user_avatar(
 
 @router.get(
     "/me/transactions",
+    # The response_model now correctly points to the imported schema
     response_model=list[TransactionsResponse],
     summary="Get user transactions",
 )
@@ -153,6 +156,7 @@ async def get_user_transactions(
     Retrieves the transaction history for the authenticated user, sorted by most recent.
     """
     transactions = pocketbase_service.get_user_transactions(current_user.id)
+    # This line will now work correctly without any changes to the logic here.
     return [TransactionsResponse.model_validate(tx) for tx in transactions]
 
 

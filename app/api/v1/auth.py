@@ -4,10 +4,11 @@ from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 
-from app.services.internal import pocketbase_service, email_service
+from app.services.internal import pocketbase_service
 from app.schemas.token import Token
 from app.schemas.msg import Msg
 from app.schemas.user import User as UserSchema
+from app.core.config import settings # Import settings for default values
 
 router = APIRouter()
 
@@ -65,11 +66,31 @@ async def register_user(user_in: UserCreateRequest):
                 status_code=status.HTTP_409_CONFLICT,
                 detail="A user with this email address already exists.",
             )
+        # Log the detailed error for debugging
+        print(f"Failed to create user {user_in.email}. Details: {error}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to create user: {error}",
+            detail=f"Failed to create user.", # Keep client message generic
         )
-    return UserSchema.model_validate(record)
+
+    # --- FIX STARTS HERE ---
+    # The 'record' object from PocketBase's create method does not contain the email.
+    # We must manually construct the response from the input data and the new record ID.
+    user_data_for_response = {
+        "id": record.id,
+        "email": user_in.email,
+        "name": user_in.name,
+        "verified": record.verified,
+        "coins": settings.FREE_SIGNUP_COINS,
+        "subscription_status": "inactive",
+        "avatar": None,
+        "active_plan_name": None,
+        "stripe_customer_id": None,
+        "stripe_subscription_id": None,
+    }
+
+    return UserSchema.model_validate(user_data_for_response)
+    # --- FIX ENDS HERE ---
 
 
 @router.post("/token", response_model=Token, summary="User Login")
