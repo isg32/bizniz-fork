@@ -3,30 +3,39 @@ One Conversational Hub{% endblock %} {% block content %}
 
 <!-- Hero Section -->
 <div
-    class="relative py-24 sm:py-32 lg:py-40"
-    style="background-color: var(--bg-theme)"
+    id="hero"
+    class="relative h-dvh py-24 sm:py-32"
+    style="
+        background-image: var(--hero-image);
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-position: center center;
+        background-attachment: fixed;
+    "
+    ;
 >
-    <div class="mx-auto max-w-7xl px-6 lg:px-8 text-center">
-        <div class="mx-auto max-w-2xl fade-in">
+    <div class="mx-auto max-w-7xl lg:px-8 text-center">
+        <div
+            class="relative max-w-[1440px] mx-auto w-full h-full flex-1 mx-auto max-w-2xl fade-in"
+        >
             <h1
-                style="color: var(--text-color)"
-                class="text-4xl font-bold tracking-tight sm:text-6xl"
+                class="pt-16 text-[32px] sm:text-[48px] lg:text-[54px] 3xl:text-[64px] leading-[110%] tracking-[-1.08px] text-white text-center relative z-10 font-normal max-w-[24ch] mx-auto text-5xl cfontz font-bold text-white tracking-tight sm:text-6xl"
             >
                 One Conversational Hub for All AI Models
             </h1>
-            <p class="mt-6 text-lg leading-8 text-slate-600">
+            <!--<p class="mt-6 text-lg leading-8 text-white">
                 Instantly access a suite of powerful AI models through a single,
                 intuitive chat interface. Stop switching apps; start creating.
-            </p>
-            <div class="mt-10 flex items-center justify-center gap-x-6">
+            </p>-->
+            <!--<div class="mt-10 flex items-center justify-center gap-x-6">
                 <a
                     href="/register"
                     class="rounded-md bg-indigo-600 px-5 py-3 text-base font-semibold text-white shadow-sm hover:bg-indigo-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 >
                     Start for Free
                 </a>
-            </div>
-            <p class="mt-4 text-sm text-slate-500">
+            </div>-->
+            <p class="mt-4 text-sm text-white">
                 Get
                 <b
                     >{{ settings.FREE_SIGNUP_COINS }} free {{
@@ -34,6 +43,101 @@ One Conversational Hub{% endblock %} {% block content %}
                 >
                 on signup. No credit card required.
             </p>
+        </div>
+    </div>
+    <div
+        class="sticky z-50 mb-4 ml-4 mr-4 md:mr-auto top-[calc(100vh-278px)] md:top-[calc(100vh-330px)] transition-opacity duration-300 ease-in-out"
+    >
+        <div
+            class="p-5 lg:p-8 lg:pr-6 relative rounded-2xl backdrop-blur-[15px] border border-white/20 shadow-[0_2px_6px_0_rgba(0,0,0,0.15)] bg-gradient-to-r from-black/12 via-black/7 to-black/7 bg-clip-padding max-w-[500px]"
+        >
+            <div class="flex relative z-10 flex-col gap-4 items-start">
+                <h2
+                    class="font-medium font-mondwest text-[22px] sm:text-[28px] xl:text-[40px] leading-[120%] md:leading-[110%] tracking-[-0.44px] sm:tracking-[-0.56px] xl:tracking-[-0.8px] text-white max-w-[25ch] text-left mb-2"
+                >
+                    Stop switching apps, start creating
+                </h2>
+                <p
+                    class="font-medium text-white text-[15px] leading-[140%] max-w-[42ch] tracking-[-0.15px] font-af"
+                >
+                    Instantly access a suite of powerful AI models through a
+                    single, intuitive chat interface. Stop switching apps; start
+                    creating.
+                </p>
+                <a href="/about"
+                    ><button
+                        data-slot="button"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive cursor-pointer group underline-offset-4 transition-colors duration-200 rounded-none focus-visible:ring-0 focus-visible:text-neutral-900 h-9 pb-2 pt-1.75 has-[&gt;svg]:px-3 text-[15px] tracking-[-0.15px] leading-[140%] px-0 mr-auto text-white group hover:text-white"
+                        style="padding: 0; margin-right: 0"
+                    >
+                        <div
+                            class="flex items-center border-b transition-all duration-200 border-b-neutral-600 hover:border-b-neutral-400"
+                        >
+                            Get to know us
+                        </div>
+                        <div
+                            class="flex items-center justify-center w-3 h-4 pl-[2.5px] pr-[1.5px] py-0 rounded-[50.496px] border leading-none"
+                            style="
+                                border-color: rgba(255, 255, 255, 0.24);
+                                background: linear-gradient(
+                                    0deg,
+                                    rgba(255, 255, 255, 0.16) 0%,
+                                    rgba(255, 255, 255, 0.08) 100%
+                                );
+                                box-shadow: 0 1.01px 1.01px 0
+                                    rgba(0, 0, 0, 0.04);
+                                margin-right: 0;
+                            "
+                        >
+                            <div
+                                class="relative w-full h-full overflow-hidden flex items-center justify-center"
+                            >
+                                <div
+                                    class="relative overflow-hidden flex items-center justify-center"
+                                    style="width: 7px; height: 10px"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="7"
+                                        height="10"
+                                        viewBox="0 0 7 10"
+                                        fill="none"
+                                        class="undefined transition-transform duration-500 group-hover:animate-[slideOut_0.8s_linear_infinite]"
+                                    >
+                                        <rect
+                                            x="3.94922"
+                                            y="4.29102"
+                                            width="1.41526"
+                                            height="1.41526"
+                                            fill="currentColor"
+                                        ></rect>
+                                        <rect
+                                            x="1.13281"
+                                            y="1.47021"
+                                            width="1.41526"
+                                            height="1.41526"
+                                            fill="currentColor"
+                                        ></rect>
+                                        <rect
+                                            x="1.13281"
+                                            y="7.11426"
+                                            width="1.41526"
+                                            height="1.41526"
+                                            fill="currentColor"
+                                        ></rect>
+                                        <rect
+                                            x="2.53125"
+                                            y="2.87549"
+                                            width="1.41526"
+                                            height="4.24579"
+                                            fill="currentColor"
+                                        ></rect>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div></button
+                ></a>
+            </div>
         </div>
     </div>
 </div>
@@ -144,6 +248,262 @@ One Conversational Hub{% endblock %} {% block content %}
     </div>
 </div>
 
+<div class="p-12">
+    <div
+        class="w-full p-5 pt-12 lg:pt-32 relative lg:p-[80px] text-white lg:min-h-[800px] bg-[#0081C0] bg-[url('https://www.generalintelligencecompany.com/images/cofounder-bg.avif')] bg-position-[30%_0%] rounded-3xl bg-cover lg:bg-bottom bg-no-repeat overflow-hidden"
+        style="
+            box-shadow:
+                0 2px 2px 0 rgba(0, 0, 0, 0.06),
+                0 6px 6px 0 rgba(0, 0, 0, 0),
+                0 0 0 5px rgba(0, 0, 0, 0.04);
+        "
+    >
+        <div
+            class="flex flex-col gap-y-12 justify-start items-start w-full h-full lg:gap-y-25 relative z-10 pb-20 lg:pb-0"
+        >
+            <div
+                class="flex flex-col gap-8 justify-start items-start w-full lg:h-full"
+            >
+                <h2
+                    class="text-[32px] sm:text-[48px] lg:text-[54px] 3xl:text-[64px] leading-[110%] tracking-[-1.08px] font-normal max-w-[28ch] xl:max-w-[30ch] text-left font-mondwest"
+                >
+                    Ready to automate? Start creating today.
+                </h2>
+                <p
+                    class="font-af font-medium text-[15px] tracking-[-0.15px] leading-[140%] min-h-[50px] lg:min-h-0 max-w-[28ch] lg:max-w-none relative"
+                >
+                    Join the smart way to use AI. Your first tasks are on us.
+                </p>
+                <a href="/register"
+                    ><button
+                        data-slot="button"
+                        class="inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium transition-all disabled:pointer-events-none disabled:opacity-50 [&amp;_svg]:pointer-events-none shrink-0 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive cursor-pointer group border border-[#41A1CF] rounded-lg bg-gradient-to-l from-white/10 to-white/19 shadow-[0_2px_6px_0_rgba(0,0,0,0.15)] backdrop-blur-[9px] h-9 px-4 py-2 has-[&gt;svg]:px-3 text-[15px] tracking-[-0.15px] leading-[140%]"
+                        aria-label="Get started with Cofounder platform"
+                    >
+                        <span style="line-height: normal"
+                            >Claim Your Free Credits</span
+                        >
+                        <div
+                            class="flex items-center justify-center w-3 h-4 pl-[2.5px] pr-[1.5px] py-0 rounded-[50.496px] border leading-none"
+                            style="
+                                border-color: rgba(255, 255, 255, 0.24);
+                                background: linear-gradient(
+                                    0deg,
+                                    rgba(255, 255, 255, 0.16) 0%,
+                                    rgba(255, 255, 255, 0.08) 100%
+                                );
+                                box-shadow: 0 1.01px 1.01px 0
+                                    rgba(0, 0, 0, 0.04);
+                            "
+                        >
+                            <div
+                                class="relative w-full h-full overflow-hidden flex items-center justify-center"
+                            >
+                                <div
+                                    class="relative overflow-hidden flex items-center justify-center"
+                                    style="width: 7px; height: 10px"
+                                >
+                                    <svg
+                                        xmlns="http://www.w3.org/2000/svg"
+                                        width="7"
+                                        height="10"
+                                        viewBox="0 0 7 10"
+                                        fill="none"
+                                        class="undefined transition-transform duration-500 group-hover:animate-[slideOut_0.8s_linear_infinite]"
+                                    >
+                                        <rect
+                                            x="3.94922"
+                                            y="4.29102"
+                                            width="1.41526"
+                                            height="1.41526"
+                                            fill="currentColor"
+                                        ></rect>
+                                        <rect
+                                            x="1.13281"
+                                            y="1.47021"
+                                            width="1.41526"
+                                            height="1.41526"
+                                            fill="currentColor"
+                                        ></rect>
+                                        <rect
+                                            x="1.13281"
+                                            y="7.11426"
+                                            width="1.41526"
+                                            height="1.41526"
+                                            fill="currentColor"
+                                        ></rect>
+                                        <rect
+                                            x="2.53125"
+                                            y="2.87549"
+                                            width="1.41526"
+                                            height="4.24579"
+                                            fill="currentColor"
+                                        ></rect>
+                                    </svg>
+                                </div>
+                            </div>
+                        </div></button
+                ></a>
+            </div>
+            <div
+                class="flex flex-col gap-4 justify-start items-start w-full h-full"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="32"
+                    height="24"
+                    viewBox="0 0 32 24"
+                    fill="none"
+                    aria-label="Chat icon"
+                >
+                    <rect
+                        x="8.45312"
+                        y="0.150391"
+                        width="10.9594"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="10.2656"
+                        y="17.1934"
+                        width="19.3555"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="19.3047"
+                        y="2.09375"
+                        width="4.29317"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="19.3047"
+                        y="15.1543"
+                        width="4.29317"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="23.5078"
+                        y="13.1523"
+                        width="4.29317"
+                        height="8.16064"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="4.25"
+                        y="2.09375"
+                        width="4.29317"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="2.27344"
+                        y="6.13086"
+                        width="6.98885"
+                        height="2.05714"
+                        transform="rotate(90 2.27344 6.13086)"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="8.28906"
+                        y="17.1152"
+                        width="6.40126"
+                        height="2.05714"
+                        transform="rotate(90 8.28906 17.1152)"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="29.7656"
+                        y="6.13086"
+                        width="7.29907"
+                        height="4.2309"
+                        transform="rotate(90 29.7656 6.13086)"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="31.7031"
+                        y="8.51367"
+                        width="8.71088"
+                        height="4.2309"
+                        transform="rotate(90 31.7031 8.51367)"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="2.21875"
+                        y="4.08398"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="2.21875"
+                        y="13.0801"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="4.17188"
+                        y="15.0234"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="8.28125"
+                        y="19.2266"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="23.5625"
+                        y="4.08398"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="25.75"
+                        y="21.293"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="16.75"
+                        y="8.6875"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="12.6953"
+                        y="8.6875"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                    <rect
+                        x="8.45312"
+                        y="8.6875"
+                        width="2.05203"
+                        height="2.05714"
+                        fill="#F3F5F2"
+                    ></rect>
+                </svg>
+                <p
+                    class="font-af font-medium text-[15px] tracking-[-0.15px] leading-[140%] max-w-[22ch]"
+                >
+                    Everyone needs an assistant, not everyone has one.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Final CTA -->
 <div style="background-color: var(--bg-color)">
     <div class="mx-auto max-w-7xl py-24 sm:px-6 sm:py-32 lg:px-8">
@@ -193,5 +553,16 @@ One Conversational Hub{% endblock %} {% block content %}
         </div>
     </div>
 </div>
+
+<style>
+    @import url("https://fonts.googleapis.com/css2?family=Gabarito:wght@400..900&display=swap");
+
+    .cfontz {
+        font-family: "Gabarito", sans-serif;
+        font-optical-sizing: auto;
+        font-weight: 600;
+        font-style: normal;
+    }
+</style>
 
 {% endblock %}
