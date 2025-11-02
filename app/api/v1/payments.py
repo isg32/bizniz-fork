@@ -1,260 +1,225 @@
-import stripe
-from fastapi import APIRouter, Request, Header, HTTPException
-from app.core.config import settings
-from app.services.internal import pocketbase_service, email_service
+# app/api/v1/payments.py
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel, Field
+
+from app.services.internal import stripe_service
+from app.core.dependencies import get_current_api_user
+from app.schemas.user import User as UserSchema
+from app.schemas.msg import Msg
 
 router = APIRouter()
 
-# --- Webhook Event Handlers ---
+# --- Schemas for API Requests ---
 
-def _get_product_details_from_line_item(line_item) -> tuple:
-    """Helper to extract product name and coins from a line item object."""
+
+class CheckoutSessionRequest(BaseModel):
+    price_id: str = Field(..., description="The ID of the Stripe Price object.")
+    mode: str = Field(
+        ...,
+        pattern="^(payment|subscription)$",
+        description="The mode of the checkout session ('payment' or 'subscription').",
+    )
+    success_url: str = Field(
+        ..., description="The URL to redirect to on successful payment."
+    )
+    cancel_url: str = Field(
+        ..., description="The URL to redirect to on cancelled payment."
+    )
+
+
+class PortalSessionRequest(BaseModel):
+    return_url: str = Field(
+        ..., description="The URL to redirect to after leaving the billing portal."
+    )
+
+
+# --- Schemas for API Responses ---
+
+
+class Product(BaseModel):
+    price_id: str
+    name: str
+    description: str | None = None
+    price: float
+    currency: str
+    coins: str  # Stored as string metadata in Stripe
+
+
+class ProductsResponse(BaseModel):
+    subscription_plans: list[Product]
+    one_time_packs: list[Product]
+
+
+class CheckoutSessionResponse(BaseModel):
+    session_id: str
+    url: str
+
+
+class PortalSessionResponse(BaseModel):
+    url: str
+
+
+# --- API Endpoints for Payments ---
+
+
+@router.get(
+    "/products", response_model=ProductsResponse, summary="Get all active products"
+)
+async def get_products():
+    """
+    Retrieves all active subscription plans and one-time purchase packs from Stripe.
+    The frontend uses this to display the pricing page.
+    """
     try:
-        product = line_item.price.product
-        product_name = product.name
-        coins = int(product.metadata.get('coins', 0))
-        return product_name, coins
-    except (AttributeError, TypeError, ValueError):
-        return "Unknown Product", 0
-
-def handle_checkout_completed(session: dict):
-    """
-    Handles the 'checkout.session.completed' event.
-    - Links Stripe Customer ID to the user.
-    - Fulfills the initial purchase (one-time or first subscription payment).
-    """
-    user_id = session.get('client_reference_id')
-    stripe_customer_id = session.get('customer')
-
-    print(f"WEBHOOK-DEBUG: Session ID: {session.get('id')}")
-    print(f"WEBHOOK-DEBUG: client_reference_id: {user_id}")
-    print(f"WEBHOOK-DEBUG: customer: {stripe_customer_id}")
-    print(f"WEBHOOK-DEBUG: mode: {session.get('mode')}")
-
-    if not user_id:
-        print(f"WEBHOOK-ERROR: Missing client_reference_id in session {session.get('id')}.")
-        return
-
-    # --- Get User ---
-    user = pocketbase_service.get_user_by_id(user_id)
-    if not user:
-        print(f"WEBHOOK-ERROR: User with ID {user_id} not found.")
-        return
-
-    # --- Handle Customer ID ---
-    # For new users, customer might be None initially, so we retrieve it from Stripe
-    if not stripe_customer_id:
-        # Try to get customer from customer_details or wait for customer.created event
-        customer_email = session.get('customer_details', {}).get('email') or session.get('customer_email')
-        print(f"WEBHOOK-INFO: No customer ID in session, but found email: {customer_email}")
-
-        # We can still fulfill the order without immediately linking the customer
-        # The customer.created webhook will handle the linking
-        stripe_customer_id = None
-
-    # Update user with stripe_customer_id if we have it
-    update_data = {}
-    if stripe_customer_id:
-        update_data["stripe_customer_id"] = stripe_customer_id
-        print(f"WEBHOOK-INFO: Linking user {user_id} with Stripe customer {stripe_customer_id}.")
-
-    # If it's a new subscription, store the subscription details
-    if session.get('mode') == 'subscription':
-        stripe_subscription_id = session.get('subscription')
-        update_data['stripe_subscription_id'] = stripe_subscription_id
-        update_data['subscription_status'] = 'active'
-        # We need to fetch the plan name for the user's dashboard
-        try:
-            subscription = stripe.Subscription.retrieve(stripe_subscription_id, expand=['items.data.price.product'])
-            # Access items - it could be a list or have a 'data' attribute
-            items = subscription.get('items')
-            if items:
-                sub_items = items.get('data', []) if isinstance(items, dict) else items
-                if sub_items and len(sub_items) > 0:
-                    product = sub_items[0].get('price', {}).get('product', {})
-                    if isinstance(product, dict):
-                        update_data['active_plan_name'] = product.get('name')
-                    else:
-                        # If product is expanded, it should have a name attribute
-                        update_data['active_plan_name'] = getattr(product, 'name', None)
-        except Exception as e:
-            print(f"WEBHOOK-API-ERROR: Could not retrieve subscription details for {stripe_subscription_id}. Error: {e}")
-
-    if update_data:
-        pocketbase_service.update_user(user_id, update_data)
-
-    # --- Fulfill the Purchase ---
-    try:
-        line_items = stripe.checkout.Session.list_line_items(session.get('id'), limit=1, expand=['data.price.product'])
-        if not line_items.data: return
-
-        product_name, coins_to_add = _get_product_details_from_line_item(line_items.data[0])
-        description = f"Purchase of {product_name}"
-        transaction_type = "purchase" if session.get('mode') == 'payment' else "subscription"
-
-        if coins_to_add > 0:
-            pocketbase_service.add_coins(user_id, coins_to_add, description, session.get('payment_intent'), transaction_type)
-            print(f"WEBHOOK-SUCCESS: Added {coins_to_add} coins to user {user_id} for {product_name}")
-        else:
-            print(f"WEBHOOK-WARN: Product in session {session.get('id')} has no 'coins' metadata.")
-    except Exception as e:
-        print(f"WEBHOOK-API-ERROR: Failed to fulfill purchase for session {session.get('id')}: {e}")
-
-def handle_invoice_succeeded(invoice: dict):
-    """
-    Handles 'invoice.payment_succeeded' for recurring subscription renewals.
-    """
-    if invoice.get('billing_reason') != 'subscription_cycle':
-        # We only care about automatic renewals, not the initial payment (handled by checkout)
-        return
-
-    stripe_customer_id = invoice.get('customer')
-    if not stripe_customer_id: return
-
-    user = pocketbase_service.get_user_by_stripe_customer_id(stripe_customer_id)
-    if not user:
-        print(f"WEBHOOK-WARN: Received recurring payment for unknown Stripe customer {stripe_customer_id}.")
-        return
-    
-    # --- Fulfill the Renewal ---
-    try:
-        line_item = invoice.get('lines', {}).get('data', [{}])[0]
-        product_name, coins_to_add = _get_product_details_from_line_item(line_item)
-        description = f"Subscription renewal: {product_name}"
-        
-        if coins_to_add > 0:
-            pocketbase_service.add_coins(user.id, coins_to_add, description, invoice.get('charge'), "renewal")
-            # --- Send Receipt Email ---
-            email_service.send_renewal_receipt_email(user.email, user.name, coins_to_add, product_name)
-        else:
-            print(f"WEBHOOK-WARN: Product in invoice {invoice.id} has no 'coins' metadata.")
-    except Exception as e:
-         print(f"WEBHOOK-API-ERROR: Failed to fulfill renewal for invoice {invoice.get('id')}: {e}")
-
-def handle_subscription_deleted(subscription: dict):
-    """
-    Handles 'customer.subscription.deleted' when a subscription is cancelled or ends.
-    This fires when the subscription period actually ends (after cancel_at_period_end expires).
-    """
-    stripe_subscription_id = subscription.get('id')
-    stripe_customer_id = subscription.get('customer')
-
-    user = pocketbase_service.get_user_by_stripe_customer_id(stripe_customer_id)
-
-    if user and user.stripe_subscription_id == stripe_subscription_id:
-        update_data = {
-            "subscription_status": "cancelled",
-            "active_plan_name": None,
-            "stripe_subscription_id": None  # Clear the subscription ID since it no longer exists
-        }
-        pocketbase_service.update_user(user.id, update_data)
-        print(f"WEBHOOK-SUCCESS: Subscription {stripe_subscription_id} ended for user {user.id}. Status set to 'cancelled'.")
-    elif user:
-        print(f"WEBHOOK-WARN: Subscription ID mismatch for user {user.id}. Expected {user.stripe_subscription_id}, got {stripe_subscription_id}")
-    else:
-        print(f"WEBHOOK-WARN: No user found for deleted subscription {stripe_subscription_id} (customer {stripe_customer_id})")
-
-def handle_subscription_updated(subscription: dict):
-    """
-    Handles 'customer.subscription.updated' when a subscription is modified.
-    This includes when cancel_at_period_end is set to True.
-    """
-    stripe_subscription_id = subscription.get('id')
-    stripe_customer_id = subscription.get('customer')
-
-    print(f"WEBHOOK-DEBUG: Processing subscription update for sub {stripe_subscription_id}, customer {stripe_customer_id}")
-    print(f"WEBHOOK-DEBUG: cancel_at_period_end = {subscription.get('cancel_at_period_end')}")
-    print(f"WEBHOOK-DEBUG: status = {subscription.get('status')}")
-
-    user = pocketbase_service.get_user_by_stripe_customer_id(stripe_customer_id)
-
-    if not user:
-        print(f"WEBHOOK-WARN: No user found for Stripe customer {stripe_customer_id}")
-        return
-
-    print(f"WEBHOOK-DEBUG: Found user {user.id} with subscription_id {getattr(user, 'stripe_subscription_id', 'None')}")
-
-    if user.stripe_subscription_id != stripe_subscription_id:
-        print(f"WEBHOOK-WARN: User {user.id} subscription ID mismatch. Expected {stripe_subscription_id}, got {user.stripe_subscription_id}")
-        return
-
-    update_data = {}
-
-    # Check if subscription is set to cancel at period end
-    if subscription.get('cancel_at_period_end'):
-        update_data['subscription_status'] = 'canceling'
-        print(f"WEBHOOK-SUCCESS: Subscription {stripe_subscription_id} for user {user.id} is set to cancel at period end.")
-    # Check if subscription was reactivated
-    elif subscription.get('status') == 'active' and not subscription.get('cancel_at_period_end'):
-        update_data['subscription_status'] = 'active'
-        print(f"WEBHOOK-SUCCESS: Subscription {stripe_subscription_id} for user {user.id} was reactivated.")
-
-    if update_data:
-        success, message = pocketbase_service.update_user(user.id, update_data)
-        if success:
-            print(f"WEBHOOK-INFO: User {user.id} updated successfully with status: {update_data.get('subscription_status')}")
-        else:
-            print(f"WEBHOOK-ERROR: Failed to update user {user.id}: {message}")
-
-def handle_customer_created(customer: dict):
-    """
-    Handles 'customer.created' event to link Stripe customer to user.
-    This is useful when checkout.session.completed doesn't have the customer ID yet.
-    """
-    stripe_customer_id = customer.get('id')
-    customer_email = customer.get('email')
-
-    print(f"WEBHOOK-DEBUG: Customer created - ID: {stripe_customer_id}, Email: {customer_email}")
-
-    if not customer_email:
-        print(f"WEBHOOK-WARN: Customer {stripe_customer_id} has no email, cannot link to user")
-        return
-
-    # Find user by email
-    try:
-        users = pocketbase_service.admin_pb.collection("users").get_full_list(
-            query_params={"filter": f'email="{customer_email}"'}
+        subscription_plans, one_time_packs = (
+            stripe_service.get_all_active_products_and_prices()
         )
-        if users:
-            user = users[0]
-            # Only update if user doesn't already have a stripe_customer_id
-            if not hasattr(user, 'stripe_customer_id') or not user.stripe_customer_id:
-                pocketbase_service.update_user(user.id, {"stripe_customer_id": stripe_customer_id})
-                print(f"WEBHOOK-SUCCESS: Linked Stripe customer {stripe_customer_id} to user {user.id}")
-            else:
-                print(f"WEBHOOK-INFO: User {user.id} already has stripe_customer_id: {user.stripe_customer_id}")
-        else:
-            print(f"WEBHOOK-WARN: No user found with email {customer_email}")
+        return ProductsResponse(
+            subscription_plans=[Product.model_validate(p) for p in subscription_plans],
+            one_time_packs=[Product.model_validate(p) for p in one_time_packs],
+        )
     except Exception as e:
-        print(f"WEBHOOK-ERROR: Failed to link customer {stripe_customer_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Could not retrieve products from payment provider: {e}",
+        )
 
 
-# --- Main Webhook Route ---
+@router.post(
+    "/checkout-session",
+    response_model=CheckoutSessionResponse,
+    summary="Create a checkout session",
+)
+async def create_checkout_session(
+    checkout_request: CheckoutSessionRequest,
+    current_user: UserSchema = Depends(get_current_api_user),
+):
+    """
+    Creates a Stripe Checkout session for the authenticated user.
+    The frontend provides success/cancel URLs and redirects the user to the returned `url`.
+    """
+    # Business Logic Checks
+    if checkout_request.mode == "subscription":
+        if current_user.subscription_status in ["active", "canceling"]:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="You already have an active subscription. Please manage it from the billing portal.",
+            )
+    if checkout_request.mode == "payment":
+        if current_user.subscription_status != "active":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="One-time purchases are only available for users with an active subscription.",
+            )
 
-EVENT_HANDLERS = {
-    'checkout.session.completed': handle_checkout_completed,
-    'invoice.payment_succeeded': handle_invoice_succeeded,
-    'customer.subscription.deleted': handle_subscription_deleted,
-    'customer.subscription.updated': handle_subscription_updated,
-    'customer.created': handle_customer_created,
-}
-
-@router.post("/stripe-webhook", include_in_schema=False)
-async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
-    """Listens for and processes all incoming events from Stripe."""
+    # Create Session
     try:
-        payload = await request.body()
-        event = stripe.Webhook.construct_event(payload, stripe_signature, settings.STRIPE_WEBHOOK_SECRET)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Webhook error: {e}")
+        session = stripe_service.create_checkout_session(
+            price_id=checkout_request.price_id,
+            user_id=current_user.id,
+            success_url=checkout_request.success_url,
+            cancel_url=checkout_request.cancel_url,
+            mode=checkout_request.mode,
+        )
+        if not session or not session.url:
+            raise HTTPException(status_code=500, detail="Failed to create session.")
 
-    # Get the appropriate handler for the event type
-    handler = EVENT_HANDLERS.get(event['type'])
-    
-    if handler:
-        print(f"STRIPE-WEBHOOK: Received and processing event: '{event['type']}' (ID: {event['id']})")
-        handler(event['data']['object'])
-    else:
-        print(f"STRIPE-WEBHOOK: Ignoring unhandled event type '{event['type']}'.")
-        
-    return {"status": "received"}
+        return CheckoutSessionResponse(session_id=session.id, url=session.url)
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Could not connect to payment provider: {e}",
+        )
+
+
+@router.post(
+    "/customer-portal",
+    response_model=PortalSessionResponse,
+    summary="Create a customer portal session",
+)
+async def create_customer_portal_session(
+    portal_request: PortalSessionRequest,
+    current_user: UserSchema = Depends(get_current_api_user),
+):
+    """
+    Creates a Stripe Customer Billing Portal session for the authenticated user.
+    The frontend provides the return_url and redirects the user to the portal.
+    """
+    if not current_user.stripe_customer_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No billing information found for this user.",
+        )
+    try:
+        portal_session = stripe_service.create_customer_portal_session(
+            stripe_customer_id=current_user.stripe_customer_id,
+            return_url=portal_request.return_url,
+        )
+        if not portal_session or not portal_session.url:
+            raise HTTPException(
+                status_code=500, detail="Failed to create portal session."
+            )
+        return PortalSessionResponse(url=portal_session.url)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Could not connect to billing provider: {e}",
+        )
+
+
+@router.post("/subscriptions/cancel", response_model=Msg, summary="Cancel subscription")
+async def cancel_subscription(current_user: UserSchema = Depends(get_current_api_user)):
+    """
+    Requests to cancel the user's active subscription at the end of the current billing period.
+    """
+    if not current_user.stripe_subscription_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No active subscription found to cancel.",
+        )
+    if current_user.subscription_status != "active":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Subscription cannot be cancelled as its status is '{current_user.subscription_status}'.",
+        )
+    success = stripe_service.cancel_subscription(current_user.stripe_subscription_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to cancel subscription with the payment provider.",
+        )
+    return {
+        "msg": "Your subscription has been scheduled for cancellation at the end of the current billing period."
+    }
+
+
+@router.post(
+    "/subscriptions/reactivate", response_model=Msg, summary="Reactivate subscription"
+)
+async def reactivate_subscription(
+    current_user: UserSchema = Depends(get_current_api_user),
+):
+    """
+    Reactivates a subscription that was previously scheduled for cancellation.
+    """
+    if not current_user.stripe_subscription_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No subscription found to reactivate.",
+        )
+    if current_user.subscription_status != "canceling":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Subscription can only be reactivated if it is currently in 'canceling' status.",
+        )
+    success = stripe_service.reactivate_subscription(
+        current_user.stripe_subscription_id
+    )
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Failed to reactivate subscription with the payment provider.",
+        )
+    return {"msg": "Your subscription has been successfully reactivated."}
