@@ -1,4 +1,5 @@
 <header
+    id="navbar"
     x-data="{ mobileMenuOpen: false, userMenuOpen: false }"
     class="fixed lg:top-4 lg:left-1/2 lg:-translate-x-1/2 z-[112] w-full lg:max-w-fit mx-auto lg:rounded-[12px] transition-all duration-[250ms] ease-[cubic-bezier(0.4,0,0.2,1)] will-change-[background-color,border-color,box-shadow,backdrop-filter] lg:border border-white/20 bg-gradient-to-r from-[rgba(249,250,247,0.12)] to-[rgba(249,250,247,0.18)] lg:shadow-[0_2px_6px_0_rgba(0,0,0,0.15)] backdrop-blur-[9px]"
     style="
@@ -7,53 +8,48 @@
     "
 >
     <nav class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex items-center justify-between h-16">
+        <div class="flex items-center justify-between h-12">
             <!-- Logo & Main Nav -->
             <div class="flex items-center">
                 <a
                     href="/"
-                    class="flex-shrink-0 flex items-center gap-2 text-xl font-bold text-slate-800"
+                    class="flex-shrink-0 flex items-center gap-2 text-sm font-bold text-slate-800"
                 >
                     <i class="fa-solid fa-brain text-indigo-600"></i>
-                    <span style="color: var(--text-color)"
-                        >{{ settings.PROJECT_NAME }}</span
-                    >
+                    <span>{{ settings.PROJECT_NAME }}</span>
                 </a>
                 <button
                     @click="toggleTheme"
                     type="button"
-                    class="toggle-button p-2 rounded-full text-slate-700 hover:text-indigo-600 transition-colors duration-200"
+                    class="toggle-button py-2 px-3 rounded-full text-slate-700 hover:bg-transparent hover:text-indigo-600 transition-colors duration-200"
                     :style="{ 'color': isDark ? 'var(--text-color)' : 'var(--text-secondary)' }"
                 >
                     <span x-show="!isDark" class="sr-only"
                         >Enable Dark Mode</span
                     >
-                    <i x-show="!isDark" class="fa-solid fa-moon text-lg"></i>
+                    <i x-show="!isDark" class="fa-solid fa-moon text-sm"></i>
                     <span x-show="isDark" class="sr-only"
                         >Enable Light Mode</span
                     >
                     <i
                         x-show="isDark"
-                        class="fa-solid fa-sun text-lg text-amber-500"
+                        class="fa-solid fa-sun text-sm text-amber-500"
                     ></i>
                 </button>
-                <div class="hidden lg:flex lg:ml-10 lg:space-x-8">
+                <div class="hidden lg:flex text-sm lg:m-2 lg:space-x-8">
                     <a
                         href="/pricing"
-                        style="color: var(--text-color-secondary)"
-                        class="text-slate-600 hover:text-indigo-600 font-medium"
+                        class="text-white hover:text-indigo-600 font-bold"
                         >Pricing</a
                     >
                     <a
                         href="/agents"
-                        style="color: var(--text-color-secondary)"
                         class="text-slate-600 hover:text-indigo-600 font-medium"
                         >Agents</a
                     >
                     <a
                         href="https://github.com/bugswriter"
                         target="_blank"
-                        style="color: var(--text-color-secondary)"
                         class="text-slate-600 hover:text-indigo-600 font-medium"
                         >Contact</a
                     >
@@ -134,7 +130,6 @@
                 <div class="hidden lg:flex items-center gap-2">
                     <a
                         href="/login"
-                        style="color: var(--text-color-secondary)"
                         class="px-4 py-2 text-sm font-semibold text-slate-600 hover:text-indigo-600"
                         >Log In</a
                     >
@@ -218,3 +213,49 @@
         {% endif %}
     </div>
 </header>
+
+<style>
+    /* Default navbar text color (when scrolled past hero) */
+    #navbar a,
+    #navbar span,
+    #navbar i {
+        color: #1e293b; /* slate-800 */
+        transition: color 0.3s ease;
+    }
+
+    /* When navbar is on top of hero (image background visible) */
+    #navbar.navbar--on-hero a,
+    #navbar.navbar--on-hero span,
+    #navbar.navbar--on-hero i {
+        color: #ffffff; /* white text for contrast */
+    }
+
+    /* Optional: change button and icon colors for consistency */
+    #navbar.navbar--on-hero .toggle-button i {
+        color: #ffffff;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const navbar = document.getElementById("navbar");
+        const hero = document.getElementById("hero");
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        // Hero is visible → white text
+                        navbar.classList.add("navbar--on-hero");
+                    } else {
+                        // Scrolled past hero → dark text
+                        navbar.classList.remove("navbar--on-hero");
+                    }
+                });
+            },
+            { threshold: 0.1 }, // Trigger when ~10% of hero is visible
+        );
+
+        if (hero) observer.observe(hero);
+    });
+</script>
