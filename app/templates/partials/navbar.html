@@ -135,7 +135,8 @@
                     >
                     <a
                         href="/register"
-                        class="px-4 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-md hover:bg-indigo-700 shadow-sm"
+                        class="px-4 py-2 text-sm font-semibold bg-indigo-600 rounded-md hover:bg-indigo-700 shadow-sm"
+                        style="color: white"
                         >Get Started</a
                     >
                 </div>
@@ -213,28 +214,6 @@
         {% endif %}
     </div>
 </header>
-
-<style>
-    /* Default navbar text color (when scrolled past hero) */
-    #navbar a,
-    #navbar span,
-    #navbar i {
-        color: #1e293b; /* slate-800 */
-        transition: color 0.3s ease;
-    }
-
-    /* When navbar is on top of hero (image background visible) */
-    #navbar.navbar--on-hero a,
-    #navbar.navbar--on-hero span,
-    #navbar.navbar--on-hero i {
-        color: #ffffff; /* white text for contrast */
-    }
-
-    /* Optional: change button and icon colors for consistency */
-    #navbar.navbar--on-hero .toggle-button i {
-        color: #ffffff;
-    }
-</style>
 
 <script>
     document.addEventListener("DOMContentLoaded", () => {

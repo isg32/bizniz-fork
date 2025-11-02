@@ -46,6 +46,30 @@
                 --border-color: #e2e8f0; /* border-slate-200 */
                 --accent-color: #4f46e5; /* indigo-600 */
                 --shadow-color: rgba(0, 0, 0, 0.1);
+                --hero-image: url("https://preview.redd.it/purple-landscape-pixel-art-1920x1200-v0-rrai1fxga98c1.png?auto=webp&s=929411de23739c4841b998fd72f6eb5a604ae64e");
+                /* https://images6.alphacoders.com/641/thumb-1920-641430.jpg */
+                /* https://wallpapers.com/images/hd/aesthetic-pixel-art-hd-phr63a8sdspo0ek1.jpg */
+                /* https://preview.redd.it/purple-landscape-pixel-art-1920x1200-v0-rrai1fxga98c1.png?auto=webp&s=929411de23739c4841b998fd72f6eb5a604ae64e */
+                /* Default navbar text color (when scrolled past hero) */
+                /* Default navbar text color (when scrolled past hero) */
+                #navbar a,
+                #navbar span,
+                #navbar i {
+                    color: #1e293b; /* slate-800 */
+                    transition: color 0.3s ease;
+                    color:dark: ;
+                }
+                /* When navbar is on top of hero (image background visible) */
+                #navbar.navbar--on-hero a,
+                #navbar.navbar--on-hero span,
+                #navbar.navbar--on-hero i {
+                    color: #ffffff; /* white text for contrast */
+                }
+
+                /* Optional: change button and icon colors for consistency */
+                #navbar.navbar--on-hero .toggle-button i {
+                    color: #ffffff;
+                }
             }
 
             /* Dark Theme Overrides */
@@ -58,7 +82,15 @@
                 --border-color: #374151; /* dark slate-700 */
                 --accent-color: #818cf8; /* light indigo */
                 --shadow-color: rgba(0, 0, 0, 0.4);
+                /* Default navbar text color (when scrolled past hero) */
+                #navbar a,
+                #navbar span,
+                #navbar i {
+                    color: #ffffff; /* slate-800 */
+                 }
             }
+
+
             body {
                 font-family: "Inter", sans-serif;
                 -webkit-font-smoothing: antialiased;
