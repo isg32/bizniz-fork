@@ -237,13 +237,26 @@ def burn_coins(user_id: str, amount: float, description: str):
     if not admin_pb:
         return False, "Admin client not initialized"
     try:
-        user = get_user_by_id(user_id)
-        if not user or not hasattr(user, "coins") or user.coins < amount:
-            return False, "Insufficient coins."
+        # REMOVED: Don't fetch and check the user balance here.
+        # user = get_user_by_id(user_id)
+        # if not user or not hasattr(user, "coins") or user.coins < amount:
+        #     return False, "Insufficient coins."
+
+        # ATTEMPT the atomic update directly.
         admin_pb.collection("users").update(user_id, {"coins-": amount})
+
+        # If it succeeds, log the transaction.
         _create_transaction_record(user_id, "spend", -amount, description)
         return True, f"Successfully burned {amount} coins."
+
     except ClientResponseError as e:
+        # PocketBase will return a 400 error if the DB constraint is violated.
+        if e.status == 400 and "value must be greater or equal" in str(e.data):
+            logger.warning(
+                f"FAIL [CoinBurn]: Insufficient coins for user {user_id} for amount {amount}."
+            )
+            return False, "Insufficient coins."
+
         logger.error(
             f"FAIL [CoinBurn]: Error burning coins for user {user_id}: {e.data}"
         )
