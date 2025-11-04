@@ -68,6 +68,12 @@ class Settings(BaseSettings):
     # --- NEW: Secret token for securing internal APIs ---
     INTERNAL_API_SECRET_TOKEN: str
 
+    # --- Redis Configuration ---
+    REDIS_HOST: str = "localhost"
+    REDIS_PORT: int = 6379
+    REDIS_PASSWORD: str = ""
+    REDIS_URL: str = "redis://localhost:6379/0"
+
     PROJECT_NAME: str = "bugswriter.ai"
     API_V1_STR: str = "/api/v1"
     CREDIT_UNIT_NAME: str = "Coin"

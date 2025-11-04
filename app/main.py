@@ -12,7 +12,7 @@ from app.core.config import settings
 from app.api.v1 import api_router
 
 # --- Service Client Imports for Initialization ---
-from app.services.internal import pocketbase_service
+from app.services.internal import pocketbase_service, redis_service
 
 
 @asynccontextmanager
@@ -26,10 +26,15 @@ async def lifespan(app: FastAPI):
     # Initialize your internal services
     pocketbase_service.init_clients()
     print("PocketBase clients initialized.")
+
+    await redis_service.init_client()
+    print("Redis client initialized.")
+
     yield  # --- The application runs here ---
 
     # --- Code to run on shutdown ---
     print("API shutting down.")
+    await redis_service.close_client()
 
 
 # --- App Initialization ---
