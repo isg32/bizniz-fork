@@ -1,6 +1,7 @@
 # app/api/v1/auth.py
 
-from fastapi import APIRouter, Depends, HTTPException, status, Body, Request, Response, Cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel, EmailStr, Field
 
@@ -9,7 +10,6 @@ from app.schemas.token import Token
 from app.schemas.msg import Msg
 from app.schemas.user import User as UserSchema
 from app.core.config import settings # Import settings for default values
-from typing import Annotated, Optional  # <--- ADD Annotated and Optional
 
 router = APIRouter()
 
@@ -264,9 +264,7 @@ async def oauth2_initiate(
     import urllib.parse
     auth_url = f"{provider_data.auth_url}{urllib.parse.quote(redirect_url, safe='')}"
     return {"auth_url": auth_url}
-    # 4. Return the auth_url AS-IS from the SDK.
-    # DO NOT append the redirect_url. The SDK already did.
-    return {"auth_url": auth_url}
+
 
 
 @router.get(
@@ -283,6 +281,7 @@ async def oauth2_callback(
 ):
     """
     The final step of the OAuth2 flow, retrieving state from Redis.
+    Redirects to frontend with the access token as a query parameter.
     """
     # 1. Get the verifier from Redis using the state
     pb_verifier = await redis_service.get_oauth_state(state)
@@ -313,5 +312,6 @@ async def oauth2_callback(
             detail=f"OAuth2 authentication with {provider} failed. The provider may have rejected the request.",
         )
 
-    # 5. Just return the token. No cookies, no Response object.
-    return {"access_token": auth_data.token, "token_type": "bearer"}
+    # 5. Redirect to frontend with the access token
+    success_url = f"{settings.FRONTEND_BASE_URL}/auth/callback?token={auth_data.token}"
+    return RedirectResponse(url=success_url)

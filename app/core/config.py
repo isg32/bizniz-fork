@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     CREDIT_UNIT_NAME: str = "Coin"
     CREDIT_UNIT_NAME_PLURAL: str = "Coins"
     FREE_SIGNUP_COINS: int = 10
+    FRONTEND_BASE_URL: str
 
 
 def get_settings() -> Settings:
