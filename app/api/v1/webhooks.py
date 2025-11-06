@@ -355,9 +355,9 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     event_type = event.get("type")
 
     try:
-        pocketbase_service.admin_pb.collection("processed_stripe_events").get_one(
-            event_id
-        )
+        pocketbase_service.admin_pb.collection(
+            "processed_stripe_events"
+        ).get_first_list_item(f'event_id="{event_id}"')
         logger.warning(
             "STRIPE-WEBHOOK: Duplicate event '%s' (ID: %s) received. Ignoring.",
             event_type,
@@ -396,7 +396,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
             try:
                 pocketbase_service.admin_pb.collection(
                     "processed_stripe_events"
-                ).create({"id": event_id})
+                ).create({"event_id": event_id})
             except Exception as e_create:
                 logger.critical(
                     "STRIPE-WEBHOOK: CRITICAL - Processed event '%s' but FAILED to record it. Manual check required! Error: %s",
