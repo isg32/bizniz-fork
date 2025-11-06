@@ -42,7 +42,7 @@ def _send_email(to_email: str, subject: str, html_content: str) -> bool:
 
     try:
         params: resend.Emails.SendParams = {
-            "from": f"{settings.PROJECT_NAME} <noreply@updates.bugswriter.com>",
+            "from": f"{settings.PROJECT_NAME} <no-reply@bugswriter.ai>",
             "to": [to_email],
             "subject": subject,
             "html": html_content,
