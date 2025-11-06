@@ -7,6 +7,7 @@ from app.services.internal import stripe_service
 from app.core.dependencies import get_current_api_user
 from app.schemas.user import User as UserSchema
 from app.schemas.msg import Msg
+from app.api.v1 import webhooks
 
 router = APIRouter()
 
@@ -223,3 +224,9 @@ async def reactivate_subscription(
             detail="Failed to reactivate subscription with the payment provider.",
         )
     return {"msg": "Your subscription has been successfully reactivated."}
+
+
+# --- Webhooks ---
+# Include the router from the webhooks module.
+# This makes the /stripe-webhook endpoint available under the /payments prefix.
+router.include_router(webhooks.router)

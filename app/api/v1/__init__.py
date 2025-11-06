@@ -14,4 +14,4 @@ api_router.include_router(payments.router, prefix="/payments", tags=["Payments"]
 # --- Internal Webhook Endpoints ---
 # These endpoints are not meant for the frontend, but for external services like Stripe.
 # They are included here for organizational purposes under the v1 API.
-api_router.include_router(webhooks.router, tags=["Webhooks"])
+api_router.include_router(webhooks.router, prefix="/webhooks", tags=["Webhooks"])

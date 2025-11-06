@@ -334,7 +334,7 @@ EVENT_HANDLERS = {
 }
 
 
-@router.post("/stripe", include_in_schema=False)
+@router.post("/stripe-webhook", include_in_schema=False)
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     """Listens for and processes all incoming events from Stripe."""
     try:
