@@ -9,7 +9,7 @@ from app.services.internal import pocketbase_service, redis_service
 from app.schemas.token import Token
 from app.schemas.msg import Msg
 from app.schemas.user import User as UserSchema
-from app.core.config import settings # Import settings for default values
+from app.core.config import settings  # Import settings for default values
 
 router = APIRouter()
 
@@ -71,7 +71,7 @@ async def register_user(user_in: UserCreateRequest):
         print(f"Failed to create user {user_in.email}. Details: {error}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to create user.", # Keep client message generic
+            detail=f"Failed to create user.",  # Keep client message generic
         )
 
     # --- FIX STARTS HERE ---
@@ -207,7 +207,6 @@ async def confirm_password_reset(data: PasswordResetConfirmRequest):
 # --- OAuth2 Flow for Headless API ---
 
 
-
 @router.get("/oauth2/{provider}", summary="Get OAuth2 login URL")
 async def oauth2_initiate(
     request: Request,
@@ -252,7 +251,7 @@ async def oauth2_initiate(
     stored_in_redis = await redis_service.store_oauth_state(
         state=state,
         data=code_verifier,
-        expire_seconds=600  # 10 minutes
+        expire_seconds=600,  # 10 minutes
     )
 
     if not stored_in_redis:
@@ -262,9 +261,9 @@ async def oauth2_initiate(
         )
     redirect_url = str(request.url_for("oauth2_callback", provider=provider))
     import urllib.parse
+
     auth_url = f"{provider_data.auth_url}{urllib.parse.quote(redirect_url, safe='')}"
     return {"auth_url": auth_url}
-
 
 
 @router.get(
@@ -313,5 +312,5 @@ async def oauth2_callback(
         )
 
     # 5. Redirect to frontend with the access token
-    success_url = f"{settings.FRONTEND_BASE_URL}/auth/callback?token={auth_data.token}"
+    success_url = f"{settings.FRONTEND_URL}/auth/callback?token={auth_data.token}"
     return RedirectResponse(url=success_url)
