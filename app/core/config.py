@@ -2,7 +2,7 @@
 
 import httpx
 import json
-from pydantic import Field
+from pydantic import Field, AnyHttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     POCKETBASE_URL: str
     POCKETBASE_ADMIN_EMAIL: str
     POCKETBASE_ADMIN_PASSWORD: str
+    FRONTEND_URL: AnyHttpUrl
     STRIPE_API_KEY: str
     STRIPE_WEBHOOK_SECRET: str
     GEMINI_API_KEY: str
@@ -69,14 +70,13 @@ class Settings(BaseSettings):
     INTERNAL_API_SECRET_TOKEN: str
 
     # --- Redis Configuration ---
-    REDIS_URL: str
+    REDIS_URL: str = "redis://localhost:6379/0"
 
     PROJECT_NAME: str = "bugswriter.ai"
     API_V1_STR: str = "/api/v1"
     CREDIT_UNIT_NAME: str = "Coin"
     CREDIT_UNIT_NAME_PLURAL: str = "Coins"
     FREE_SIGNUP_COINS: int = 10
-    FRONTEND_BASE_URL: str
 
 
 def get_settings() -> Settings:
