@@ -1,15 +1,16 @@
 # app/main.py
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-# --- Application Imports ---
-from app.core.config import settings
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 # 🔴 OLD LINE: from app.api.v1 import api as api_v1
 # ✅ NEW LINE: Import the actual router object directly.
 from app.api.v1 import api_router
+
+# --- Application Imports ---
+from app.core.config import settings
 
 # --- Service Client Imports for Initialization ---
 from app.services.internal import pocketbase_service, redis_service
@@ -53,6 +54,7 @@ app.add_middleware(
         "http://localhost:5173",
         "http://localhost:3000",
         "https://www.bugswriter.ai",
+        "https://test.bugswriter.ai",
     ],
     allow_credentials=True,
     allow_methods=["*"],
