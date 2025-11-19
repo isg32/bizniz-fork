@@ -53,7 +53,7 @@ app.add_middleware(
     allow_origins=[
         "http://localhost:5173",
         "http://localhost:3000",
-        "https://www.bugswriter.ai",
+        "https://bugswriter.ai",
         "https://test.bugswriter.ai",
     ],
     allow_credentials=True,
