@@ -312,5 +312,6 @@ async def oauth2_callback(
         )
 
     # 5. Redirect to frontend with the access token
-    success_url = f"{settings.FRONTEND_URL}/auth/callback?token={auth_data.token}"
+    success_url = f"{str(settings.FRONTEND_URL).rstrip('/')}/auth/callback?token={auth_data.token}"
+
     return RedirectResponse(url=success_url)
