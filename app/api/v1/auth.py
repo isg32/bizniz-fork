@@ -9,11 +9,55 @@ from app.services.internal import pocketbase_service, redis_service
 from app.schemas.token import Token
 from app.schemas.msg import Msg
 from app.schemas.user import User as UserSchema
+from app.schemas.token import Token, GoogleLoginRequest
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 from app.core.config import settings  # Import settings for default values
 
 router = APIRouter()
 
 # --- Schemas for Auth API Requests ---
+GOOGLE_CLIENT_ID = (
+    "305878266915-o7gf5uif1u8qgv6ulanlb68g71dat1if.apps.googleusercontent.com"
+)
+
+
+@router.post("/google", response_model=Token, summary="Login with Google ID Token")
+async def login_google(request: GoogleLoginRequest):
+    """
+    Exchanges a Google ID Token (from mobile/web) for a Session Token.
+    """
+    try:
+        # 1. Verify the token with Google
+        id_info = id_token.verify_oauth2_token(
+            request.id_token,
+            google_requests.Request(),
+            GOOGLE_CLIENT_ID,
+            clock_skew_in_seconds=10,
+        )
+
+        email = id_info.get("email")
+        name = id_info.get("name", "")
+
+        if not email:
+            raise HTTPException(status_code=400, detail="Google token missing email")
+
+        # 2. Perform Login/Registration Logic in Service
+        auth_data, error = pocketbase_service.login_via_google_id_token(email, name)
+
+        if error:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Login failed: {error}",
+            )
+
+        return {"access_token": auth_data.token, "token_type": "bearer"}
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid Google Token: {str(e)}")
+    except Exception as e:
+        # logger.error(...)
+        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
 
 
 class UserCreateRequest(BaseModel):

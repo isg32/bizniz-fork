@@ -16,4 +16,7 @@ dependencies = [
     "python-multipart>=0.0.20",
     "uvicorn>=0.37.0",
     "redis>=7.0.1",
+    "google>=3.0.0",
+    "google-auth>=2.43.0",
+    "requests>=2.32.5",
 ]

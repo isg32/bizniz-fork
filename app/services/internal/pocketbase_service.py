@@ -1,5 +1,7 @@
 # app/services/internal/pocketbase_service.py
 
+import uuid
+import secrets
 import logging
 from pocketbase import PocketBase
 from pocketbase.utils import ClientResponseError
@@ -10,6 +12,79 @@ from app.core.config import settings
 pb: PocketBase | None = None
 admin_pb: PocketBase | None = None
 logger = logging.getLogger(__name__)
+
+
+def login_via_google_id_token(email: str, name: str):
+    """
+    Logs in or registers a user using a verified email from Google.
+    Generates a valid PocketBase token by rotating the user's password.
+    """
+    if not admin_pb:
+        return None, "Admin client not initialized"
+
+    try:
+        # 1. Check if user exists
+        user = get_user_by_email(email)
+
+        if user:
+            # User exists. We need to generate a token for them.
+            # Since we don't know their password, and we are an admin,
+            # we will set a new temporary password to authenticate them.
+            # Note: This technically resets their password.
+            # Ideally, PocketBase would support 'impersonate', but it doesn't yet.
+            temp_password = secrets.token_urlsafe(32)
+            admin_pb.collection("users").update(
+                user.id,
+                {
+                    "password": temp_password,
+                    "passwordConfirm": temp_password,
+                    "verified": True,  # Trust Google verification
+                },
+            )
+
+            # Now authenticate as them
+            # We use a separate client instance to avoid polluting admin state
+            user_client = PocketBase(settings.POCKETBASE_URL)
+            auth_data = user_client.collection("users").auth_with_password(
+                email, temp_password
+            )
+            return auth_data, None
+
+        else:
+            # User does not exist. Create them.
+            random_password = secrets.token_urlsafe(32)
+            user_data = {
+                "email": email,
+                "password": random_password,
+                "passwordConfirm": random_password,
+                "name": name,
+                "coins": float(settings.FREE_SIGNUP_COINS),
+                "subscription_status": "inactive",
+                "verified": True,  # Trust Google
+            }
+            record = admin_pb.collection("users").create(user_data)
+
+            # Log transaction
+            _create_transaction_record(
+                record.id,
+                "bonus",
+                settings.FREE_SIGNUP_COINS,
+                "Free signup coins via Google",
+            )
+
+            # Authenticate
+            user_client = PocketBase(settings.POCKETBASE_URL)
+            auth_data = user_client.collection("users").auth_with_password(
+                email, random_password
+            )
+            return auth_data, None
+
+    except ClientResponseError as e:
+        logger.error(f"Google Login/Register failed for {email}: {e.data}")
+        return None, str(e.data)
+    except Exception as e:
+        logger.error(f"Unexpected error in Google Login: {e}")
+        return None, str(e)
 
 
 def init_clients():
