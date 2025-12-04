@@ -1,5 +1,7 @@
 # app/api/v1/auth.py
 
+import json
+import urllib.parse
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import RedirectResponse
 from fastapi.security import OAuth2PasswordRequestForm
@@ -9,55 +11,11 @@ from app.services.internal import pocketbase_service, redis_service
 from app.schemas.token import Token
 from app.schemas.msg import Msg
 from app.schemas.user import User as UserSchema
-from app.schemas.token import Token, GoogleLoginRequest
-from google.oauth2 import id_token
-from google.auth.transport import requests as google_requests
-from app.core.config import settings  # Import settings for default values
+from app.core.config import settings
 
 router = APIRouter()
 
 # --- Schemas for Auth API Requests ---
-GOOGLE_CLIENT_ID = (
-    "305878266915-o7gf5uif1u8qgv6ulanlb68g71dat1if.apps.googleusercontent.com"
-)
-
-
-@router.post("/google", response_model=Token, summary="Login with Google ID Token")
-async def login_google(request: GoogleLoginRequest):
-    """
-    Exchanges a Google ID Token (from mobile/web) for a Session Token.
-    """
-    try:
-        # 1. Verify the token with Google
-        id_info = id_token.verify_oauth2_token(
-            request.id_token,
-            google_requests.Request(),
-            GOOGLE_CLIENT_ID,
-            clock_skew_in_seconds=10,
-        )
-
-        email = id_info.get("email")
-        name = id_info.get("name", "")
-
-        if not email:
-            raise HTTPException(status_code=400, detail="Google token missing email")
-
-        # 2. Perform Login/Registration Logic in Service
-        auth_data, error = pocketbase_service.login_via_google_id_token(email, name)
-
-        if error:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail=f"Login failed: {error}",
-            )
-
-        return {"access_token": auth_data.token, "token_type": "bearer"}
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid Google Token: {str(e)}")
-    except Exception as e:
-        # logger.error(...)
-        raise HTTPException(status_code=500, detail=f"Authentication error: {str(e)}")
 
 
 class UserCreateRequest(BaseModel):
@@ -78,12 +36,6 @@ class PasswordResetConfirmRequest(BaseModel):
 
 class VerificationConfirmRequest(BaseModel):
     token: str
-
-
-class OAuth2CallbackRequest(BaseModel):
-    code: str
-    code_verifier: str
-    redirect_uri: str
 
 
 # --- Authentication Endpoints ---
@@ -118,9 +70,9 @@ async def register_user(user_in: UserCreateRequest):
             detail=f"Failed to create user.",  # Keep client message generic
         )
 
-    # --- FIX STARTS HERE ---
-    # The 'record' object from PocketBase's create method does not contain the email.
-    # We must manually construct the response from the input data and the new record ID.
+    # The 'record' object from PocketBase's create method does not contain the email
+    # in the format Pydantic expects immediately for validation in some SDK versions.
+    # We manually construct the response from the input data and the new record ID.
     user_data_for_response = {
         "id": record.id,
         "email": user_in.email,
@@ -135,7 +87,6 @@ async def register_user(user_in: UserCreateRequest):
     }
 
     return UserSchema.model_validate(user_data_for_response)
-    # --- FIX ENDS HERE ---
 
 
 @router.post("/token", response_model=Token, summary="User Login")
@@ -248,24 +199,25 @@ async def confirm_password_reset(data: PasswordResetConfirmRequest):
     }
 
 
-# --- OAuth2 Flow for Headless API ---
+# --- OAuth2 Flow ---
 
 
 @router.get("/oauth2/{provider}", summary="Get OAuth2 login URL")
 async def oauth2_initiate(
     request: Request,
     provider: str,
+    platform: str = "web",  # New parameter: defaults to 'web', pass 'mobile' for app redirect
 ):
     """
     Initiates the OAuth2 login flow using Redis for state.
+
+    Query Params:
+    - platform: 'web' (default) or 'mobile'. If 'mobile', callback redirects to bwai:// scheme.
     """
-    # 1. Define the redirect_url FIRST
-    # This MUST match what's in your Google/PocketBase consoles
+    # 1. Define the redirect_url
+    # This MUST match exactly what is configured in Google Cloud Console / PocketBase
     redirect_url = str(request.url_for("oauth2_callback", provider=provider))
 
-    # 2. Pass the redirect_url to the service
-    # (This assumes your pocketbase_service.get_oauth2_providers was updated
-    # to accept and pass `redirect_url` to the SDK, as I advised before)
     try:
         providers = pocketbase_service.get_oauth2_providers()
     except Exception as e:
@@ -291,10 +243,13 @@ async def oauth2_initiate(
             detail="OAuth2 provider did not return all required data.",
         )
 
-    # 3. Store the verifier in Redis, using state as the key
+    # 3. Store the verifier AND the platform in Redis
+    # We serialize this to JSON to store multiple values in the state key
+    state_payload = json.dumps({"verifier": code_verifier, "platform": platform})
+
     stored_in_redis = await redis_service.store_oauth_state(
         state=state,
-        data=code_verifier,
+        data=state_payload,
         expire_seconds=600,  # 10 minutes
     )
 
@@ -303,11 +258,13 @@ async def oauth2_initiate(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Login service is temporarily unavailable. Please try again later.",
         )
-    redirect_url = str(request.url_for("oauth2_callback", provider=provider))
-    import urllib.parse
 
-    auth_url = f"{provider_data.auth_url}{urllib.parse.quote(redirect_url, safe='')}"
-    return {"auth_url": auth_url}
+    # Construct the full auth URL
+    full_auth_url = (
+        f"{provider_data.auth_url}{urllib.parse.quote(redirect_url, safe='')}"
+    )
+
+    return {"auth_url": full_auth_url}
 
 
 @router.get(
@@ -323,29 +280,40 @@ async def oauth2_callback(
     state: str,
 ):
     """
-    The final step of the OAuth2 flow, retrieving state from Redis.
-    Redirects to frontend with the access token as a query parameter.
+    The final step of the OAuth2 flow.
+    Retrieves verifier and platform preference from Redis.
+    Redirects to frontend (Web) or App Scheme (Mobile) with access token.
     """
-    # 1. Get the verifier from Redis using the state
-    pb_verifier = await redis_service.get_oauth_state(state)
+    # 1. Get the state payload from Redis
+    stored_data = await redis_service.get_oauth_state(state)
 
-    if not pb_verifier:
+    if not stored_data:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Login session expired or is invalid. Please try logging in again.",
         )
 
-    # 2. IMPORTANT: Delete the one-time use key
+    # 2. Parse the stored data (JSON)
+    try:
+        data_obj = json.loads(stored_data)
+        pb_verifier = data_obj["verifier"]
+        platform = data_obj.get("platform", "web")
+    except (json.JSONDecodeError, TypeError, KeyError):
+        # Fallback for backward compatibility if old plain strings exist in Redis
+        pb_verifier = stored_data
+        platform = "web"
+
+    # 3. IMPORTANT: Delete the one-time use key
     await redis_service.delete_oauth_state(state)
 
-    # 3. Re-create the *exact same* redirect_uri
+    # 4. Re-create the *exact same* redirect_uri for validation
     redirect_uri = str(request.url_for("oauth2_callback", provider=provider))
 
-    # 4. Authenticate
+    # 5. Authenticate with PocketBase
     auth_data = pocketbase_service.auth_with_oauth2(
         provider=provider,
         code=code,
-        code_verifier=pb_verifier,  # <-- Use the verifier from Redis
+        code_verifier=pb_verifier,
         redirect_url=redirect_uri,
     )
 
@@ -355,7 +323,12 @@ async def oauth2_callback(
             detail=f"OAuth2 authentication with {provider} failed. The provider may have rejected the request.",
         )
 
-    # 5. Redirect to frontend with the access token
-    success_url = f"{str(settings.FRONTEND_URL).rstrip('/')}/auth/callback?token={auth_data.token}"
+    # 6. Redirect based on Platform
+    if platform == "mobile":
+        # Deep link for Flutter App
+        success_url = f"bwai://login-callback?token={auth_data.token}"
+    else:
+        # Standard web frontend redirect
+        success_url = f"{str(settings.FRONTEND_URL).rstrip('/')}/auth/callback?token={auth_data.token}"
 
     return RedirectResponse(url=success_url)
