@@ -206,7 +206,7 @@ async def confirm_password_reset(data: PasswordResetConfirmRequest):
 async def oauth2_initiate(
     request: Request,
     provider: str,
-    platform: str = "web",  # New parameter: defaults to 'web', pass 'mobile' for app redirect
+    platform: str = "web",  # Defaults to 'web', pass 'mobile' for app redirect
 ):
     """
     Initiates the OAuth2 login flow using Redis for state.
@@ -331,4 +331,6 @@ async def oauth2_callback(
         # Standard web frontend redirect
         success_url = f"{str(settings.FRONTEND_URL).rstrip('/')}/auth/callback?token={auth_data.token}"
 
-    return RedirectResponse(url=success_url)
+    # Use HTTP 303 See Other to ensure the browser strictly follows the redirection
+    # to the new scheme/location without retaining the POST method if applicable.
+    return RedirectResponse(url=success_url, status_code=status.HTTP_303_SEE_OTHER)
